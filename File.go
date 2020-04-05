@@ -7,6 +7,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -242,7 +243,7 @@ var NoProxyWriter = func(w io.Writer) io.Writer {
 // [0] public name
 // [1] encryption
 // [2] encryptionKey
-func (libdm LibDM) UploadFile(localFile, name string, public bool, replaceFile uint, attributes FileAttributes, proxyWriter func(w io.Writer) io.Writer, fsDetermined chan int64, strArgs ...string) (*UploadResponse, error) {
+func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, attributes FileAttributes, proxyWriter func(w io.Writer) io.Writer, fsDetermined chan int64, strArgs ...string) (*UploadResponse, error) {
 	if replaceFile < 0 {
 		replaceFile = 0
 	}
@@ -270,7 +271,20 @@ func (libdm LibDM) UploadFile(localFile, name string, public bool, replaceFile u
 
 	var contentType string
 	var body io.Reader
-	body, contentType, request.Size = FileUploader(localFile, proxyWriter, encryption, encryptionKey)
+
+	// Check for url/file
+	u, err := url.Parse(path)
+	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+		request.UploadType = URLUploadType
+		request.URL = path
+
+		contentType = string(JSONContentType)
+	} else {
+		// Init upload stuff
+		request.UploadType = FileUploadType
+		body, contentType, request.Size = FileUploader(path, proxyWriter, encryption, encryptionKey)
+	}
+
 	if fsDetermined != nil {
 		fsDetermined <- request.Size
 	}
