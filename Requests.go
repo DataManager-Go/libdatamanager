@@ -91,6 +91,13 @@ type RequestConfig struct {
 	SessionToken string
 }
 
+func (rc RequestConfig) GetBearerAuth() Authorization {
+	return Authorization{
+		Type:    Bearer,
+		Palyoad: rc.SessionToken,
+	}
+}
+
 // Request a rest server request
 type Request struct {
 	RequestType   RequestType
@@ -208,6 +215,13 @@ func (request *Request) WithRequestType(rType RequestType) *Request {
 // WithAuth with authorization
 func (request *Request) WithAuth(a Authorization) *Request {
 	request.Authorization = &a
+	return request
+}
+
+// WithAuthFromConfig with authorization
+func (request *Request) WithAuthFromConfig() *Request {
+	auth := request.Config.GetBearerAuth()
+	request.Authorization = &auth
 	return request
 }
 

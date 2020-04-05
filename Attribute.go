@@ -1,9 +1,5 @@
 package libdatamanager
 
-import (
-	"fmt"
-)
-
 // Attribute attribute for file (tag/group)
 type Attribute string
 
@@ -14,7 +10,7 @@ const (
 )
 
 // Do an attribute request (update/delete group or tag). action: 0 - delete, 1 - update
-func (libdm LibDM) attributeRequest(attribute Attribute, namespace string, action uint8, name string, newName ...string) (*RestRequestResponse, error) {
+func (libdm LibDM) attributeRequest(attribute Attribute, action uint8, namespace string, name string, newName ...string) (*RestRequestResponse, error) {
 	var endpoint Endpoint
 
 	// Pick right endpoint
@@ -43,16 +39,11 @@ func (libdm LibDM) attributeRequest(attribute Attribute, namespace string, actio
 		request.NewName = newName[0]
 	}
 
-	resp, err := NewRequest(endpoint, request, libdm.Config).WithAuth(Authorization{
-		Type:    Bearer,
-		Palyoad: libdm.Config.SessionToken,
-	}).Do(nil)
+	// Make http request
+	resp, err := NewRequest(endpoint, request, libdm.Config).WithAuthFromConfig().Do(nil)
 
 	if err != nil {
-		if resp != nil {
-			fmt.Println("http:", resp.HTTPCode)
-			return nil, NewErrorFromResponse(resp)
-		}
+		return nil, NewErrorFromResponse(resp)
 	}
 
 	if resp.Status == ResponseError {
@@ -64,10 +55,10 @@ func (libdm LibDM) attributeRequest(attribute Attribute, namespace string, actio
 
 // UpdateAttribute update an attribute
 func (libdm LibDM) UpdateAttribute(attribute Attribute, namespace, name, newName string) (*RestRequestResponse, error) {
-	return libdm.attributeRequest(attribute, namespace, 1, name, newName)
+	return libdm.attributeRequest(attribute, 1, namespace, name, newName)
 }
 
 // DeleteAttribute update an attribute
 func (libdm LibDM) DeleteAttribute(attribute Attribute, namespace, name string) (*RestRequestResponse, error) {
-	return libdm.attributeRequest(attribute, namespace, 0, name)
+	return libdm.attributeRequest(attribute, 0, namespace, name)
 }
