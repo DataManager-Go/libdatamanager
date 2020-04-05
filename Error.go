@@ -8,10 +8,6 @@ import (
 var (
 	// ErrInvalidResponseHeaders error on missing or malformed response headers
 	ErrInvalidResponseHeaders = errors.New("Invalid response headers")
-	// ErrInvalidAuthorizationMethod error if authorization method is not implemented
-	ErrInvalidAuthorizationMethod = errors.New("Invalid request authorization method")
-	// ErrNonOkResponsecode if requests responsecode is non http.ok
-	ErrNonOkResponsecode = errors.New("non ok response")
 	// ErrResponseError response returned an error
 	ErrResponseError = errors.New("response returned an error")
 	// ErrResponseFilenameInvalid if server returns no filename

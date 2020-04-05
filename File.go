@@ -288,10 +288,7 @@ func (libdm LibDM) UploadFile(localFile, name string, public bool, replaceFile u
 	var resStruct UploadResponse
 	response, err := NewRequest(EPFileUpload, body, libdm.Config).
 		WithMethod(PUT).
-		WithAuth(Authorization{
-			Type:    Bearer,
-			Palyoad: libdm.Config.SessionToken,
-		}).WithHeader(HeaderRequest, rBase).
+		WithAuth(libdm.Config.GetBearerAuth()).WithHeader(HeaderRequest, rBase).
 		WithRequestType(RawRequestType).
 		WithContentType(ContentType(contentType)).
 		Do(&resStruct)

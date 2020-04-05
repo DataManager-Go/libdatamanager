@@ -5,7 +5,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -14,19 +13,6 @@ import (
 	"os"
 	"strings"
 )
-
-func encodeBase64(b []byte) []byte {
-	return []byte(base64.StdEncoding.EncodeToString(b))
-}
-
-func decodeBase64(b []byte) []byte {
-	data, err := base64.StdEncoding.DecodeString(string(b))
-	if err != nil {
-		fmt.Println("Error: Bad Key!")
-		os.Exit(1)
-	}
-	return data
-}
 
 // Return byte slice with base64 encoded file content
 func fileToBase64(filename string, fh *os.File) ([]byte, error) {
