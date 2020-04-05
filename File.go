@@ -68,3 +68,34 @@ func (libdm LibDM) ListFiles(name string, id uint, allNamespaces bool, attribute
 
 	return &response, nil
 }
+
+// PublishFile publishs a file. If "all" is true, the response object is BulkPublishResponse. Else it is PublishResponse
+func (libdm LibDM) PublishFile(name string, id uint, publicName string, all bool, attributes FileAttributes) (interface{}, error) {
+	request := *NewRequest(EPFilePublish, FileRequest{
+		Name:       name,
+		FileID:     id,
+		PublicName: publicName,
+		All:        all,
+		Attributes: attributes,
+	}, libdm.Config).WithAuthFromConfig()
+
+	var err error
+	var response *RestRequestResponse
+	var resp interface{}
+
+	if all {
+		var respData BulkPublishResponse
+		response, err = request.Do(&respData)
+		resp = respData
+	} else {
+		var respData PublishResponse
+		response, err = request.Do(&respData)
+		resp = respData
+	}
+
+	if err != nil || response.Status == ResponseError {
+		return nil, err
+	}
+
+	return resp, nil
+}
