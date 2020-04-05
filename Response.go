@@ -27,6 +27,8 @@ const (
 	HeaderRequest string = "Request"
 	// HeaderEncryption encryption header
 	HeaderEncryption string = "X-Encryption"
+	// HeaderContentLength request content length
+	HeaderContentLength string = "ContentLength"
 )
 
 // LoginResponse response for login
