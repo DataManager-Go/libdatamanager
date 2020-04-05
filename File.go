@@ -243,7 +243,7 @@ var NoProxyWriter = func(w io.Writer) io.Writer {
 // [0] public name
 // [1] encryption
 // [2] encryptionKey
-func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, attributes FileAttributes, proxyWriter func(w io.Writer) io.Writer, fsDetermined chan int64, strArgs ...string) (*UploadResponse, error) {
+func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, attributes FileAttributes, proxyWriter func(w io.Writer) io.Writer, fsDetermined chan int64, done chan int8, strArgs ...string) (*UploadResponse, error) {
 	if replaceFile < 0 {
 		replaceFile = 0
 	}
@@ -282,7 +282,7 @@ func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, 
 	} else {
 		// Init upload stuff
 		request.UploadType = FileUploadType
-		body, contentType, request.Size = FileUploader(path, proxyWriter, encryption, encryptionKey)
+		body, contentType, request.Size = FileUploader(path, proxyWriter, encryption, encryptionKey, done)
 	}
 
 	if fsDetermined != nil {
@@ -317,7 +317,7 @@ func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, 
 
 var Boundary = "MachliJalKiRaniHaiJeevanUskaPaaniHai"
 
-func FileUploader(path string, proxyWriter func(io.Writer) io.Writer, encryption, encryptionKey string) (r *io.PipeReader, contentType string, size int64) {
+func FileUploader(path string, proxyWriter func(io.Writer) io.Writer, encryption, encryptionKey string, done chan int8) (r *io.PipeReader, contentType string, size int64) {
 	// Open file
 	f, err := os.Open(path)
 	if err != nil {
@@ -369,6 +369,7 @@ func FileUploader(path string, proxyWriter func(io.Writer) io.Writer, encryption
 		w.Close()
 		f.Close()
 		mpw.Close()
+		done <- 1
 	}()
 
 	return
