@@ -50,6 +50,23 @@ func (libdm LibDM) DeleteNamespace(name string) (*StringResponse, error) {
 	return libdm.namespaceRequest(0, name, "", false)
 }
 
+// GetNamespaces get all namespaces
+func (libdm LibDM) GetNamespaces() (*StringSliceResponse, error) {
+	var resp StringSliceResponse
+
+	response, err := NewRequest(EPNamespaceList, nil, libdm.Config).WithAuthFromConfig().Do(&resp)
+
+	if err != nil {
+		return nil, NewErrorFromResponse(response)
+	}
+
+	if response.Status == ResponseError {
+		return nil, ErrResponseError
+	}
+
+	return &resp, nil
+}
+
 func namespaceActionToEndpoint(action uint8) (endpoint Endpoint) {
 	switch action {
 	case 0:
