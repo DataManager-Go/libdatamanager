@@ -1,6 +1,8 @@
 package libdatamanager
 
 import (
+	"io"
+	"strconv"
 	"time"
 )
 
@@ -98,4 +100,47 @@ func (libdm LibDM) PublishFile(name string, id uint, publicName string, all bool
 	}
 
 	return resp, nil
+}
+
+// DownloadFileToReader returns a readCloser for the request body == file content
+// Body must be closed
+func (libdm LibDM) DownloadFileToReader(name string, id uint, namespace string) (*io.ReadCloser, string, error) {
+	resp, err := NewRequest(EPFileGet, &FileRequest{
+		Name:   name,
+		FileID: id,
+		Attributes: FileAttributes{
+			Namespace: namespace,
+		},
+	}, libdm.Config).WithAuthFromConfig().DoHTTPRequest()
+
+	// Check for error
+	if err != nil {
+		return nil, "", &ResponseErr{
+			Err: err,
+		}
+	}
+
+	// Check response headers
+	if resp.Header.Get(HeaderStatus) == strconv.Itoa(int(ResponseError)) {
+		return nil, "", &ResponseErr{
+			Response: &RestRequestResponse{
+				HTTPCode: resp.StatusCode,
+				Headers:  &resp.Header,
+				Message:  resp.Header.Get(HeaderStatusMessage),
+				Status:   ResponseError,
+			},
+		}
+	}
+
+	// Get filename from response headers
+	serverFileName := resp.Header.Get(HeaderFileName)
+
+	// Check headers
+	if len(serverFileName) == 0 {
+		return nil, "", &ResponseErr{
+			Err: ErrResponseFilenameInvalid,
+		}
+	}
+
+	return &resp.Body, serverFileName, nil
 }

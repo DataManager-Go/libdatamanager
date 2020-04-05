@@ -13,7 +13,9 @@ var (
 	// ErrNonOkResponsecode if requests responsecode is non http.ok
 	ErrNonOkResponsecode = errors.New("non ok response")
 	// ErrResponseError response returned an error
-	ErrResponseError = errors.New("Response returned an error")
+	ErrResponseError = errors.New("response returned an error")
+	// ErrResponseFilenameInvalid if server returns no filename
+	ErrResponseFilenameInvalid = errors.New("invalid filename received")
 )
 
 // ResponseErr response error

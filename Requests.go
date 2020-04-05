@@ -365,5 +365,7 @@ func (request Request) Do(retVar interface{}) (*RestRequestResponse, error) {
 		}
 	}
 
+	resp.Body.Close()
+
 	return response, nil
 }
