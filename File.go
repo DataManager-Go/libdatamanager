@@ -2,6 +2,8 @@ package libdatamanager
 
 import (
 	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 )
@@ -104,7 +106,7 @@ func (libdm LibDM) PublishFile(name string, id uint, publicName string, all bool
 
 // DownloadFileToReader returns a readCloser for the request body == file content
 // Body must be closed
-func (libdm LibDM) DownloadFileToReader(name string, id uint, namespace string) (*io.ReadCloser, string, error) {
+func (libdm LibDM) DownloadFileToReader(name string, id uint, namespace string) (io.ReadCloser, string, error) {
 	resp, err := NewRequest(EPFileGet, &FileRequest{
 		Name:   name,
 		FileID: id,
@@ -142,5 +144,35 @@ func (libdm LibDM) DownloadFileToReader(name string, id uint, namespace string) 
 		}
 	}
 
-	return &resp.Body, serverFileName, nil
+	return resp.Body, serverFileName, nil
+}
+
+func (libdm LibDM) DownloadFile(name string, id uint, namespace, localFilePath string, appendFilename ...bool) error {
+	// Download file from server
+	rcl, name, err := libdm.DownloadFileToReader(name, id, namespace)
+	if err != nil {
+		return err
+	}
+	defer rcl.Close()
+
+	// Append remote filename if desired
+	if len(appendFilename) > 0 && appendFilename[0] {
+		localFilePath = filepath.Join(localFilePath, name)
+	}
+
+	// Create loal file
+	f, err := os.Create(localFilePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Save file to local file
+	buff := make([]byte, 512)
+	_, err = io.CopyBuffer(f, rcl, buff)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
