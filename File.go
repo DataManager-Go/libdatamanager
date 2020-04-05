@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"mime/multipart"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -118,7 +119,7 @@ func (libdm LibDM) PublishFile(name string, id uint, publicName string, all bool
 
 // DownloadFileToReader returns a readCloser for the request body == file content
 // Body must be closed
-func (libdm LibDM) DownloadFileToReader(name string, id uint, namespace string) (io.ReadCloser, string, error) {
+func (libdm LibDM) GetFile(name string, id uint, namespace string) (*http.Response, string, error) {
 	resp, err := NewRequest(EPFileGet, &FileRequest{
 		Name:   name,
 		FileID: id,
@@ -156,17 +157,17 @@ func (libdm LibDM) DownloadFileToReader(name string, id uint, namespace string) 
 		}
 	}
 
-	return resp.Body, serverFileName, nil
+	return resp, serverFileName, nil
 }
 
 // DownloadFile downloads and saves a file to the given localFilePath. If the file exists, it will be overwritten
 func (libdm LibDM) DownloadFile(name string, id uint, namespace, localFilePath string, appendFilename ...bool) error {
 	// Download file from server
-	rcl, name, err := libdm.DownloadFileToReader(name, id, namespace)
+	resp, name, err := libdm.GetFile(name, id, namespace)
 	if err != nil {
 		return err
 	}
-	defer rcl.Close()
+	defer resp.Body.Close()
 
 	// Append remote filename if desired
 	if len(appendFilename) > 0 && appendFilename[0] {
@@ -182,7 +183,7 @@ func (libdm LibDM) DownloadFile(name string, id uint, namespace, localFilePath s
 
 	// Save file to local file
 	buff := make([]byte, 512)
-	_, err = io.CopyBuffer(f, rcl, buff)
+	_, err = io.CopyBuffer(f, resp.Body, buff)
 	if err != nil {
 		return err
 	}
