@@ -18,14 +18,13 @@ func (libdm LibDM) namespaceRequest(action uint8, name, newName string, customNs
 		nsType = CustomNamespaceType
 	}
 
-	resp, err := NewRequest(endpoint, NamespaceRequest{
+	// Do http request
+	if _, err := libdm.Request(endpoint, &NamespaceRequest{
 		Namespace: name,
 		NewName:   newName,
 		Type:      nsType,
-	}, libdm.Config).WithAuthFromConfig().Do(&response)
-
-	if err != nil || resp.Status == ResponseError {
-		return nil, NewErrorFromResponse(resp)
+	}, &response, true); err != nil {
+		return nil, err
 	}
 
 	return &response, nil
@@ -50,10 +49,9 @@ func (libdm LibDM) DeleteNamespace(name string) (*StringResponse, error) {
 func (libdm LibDM) GetNamespaces() (*StringSliceResponse, error) {
 	var resp StringSliceResponse
 
-	response, err := NewRequest(EPNamespaceList, nil, libdm.Config).WithAuthFromConfig().Do(&resp)
-
-	if err != nil || response.Status == ResponseError {
-		return nil, NewErrorFromResponse(response)
+	// Do http request
+	if _, err := libdm.Request(EPNamespaceList, nil, &resp, true); err != nil {
+		return nil, err
 	}
 
 	return &resp, nil

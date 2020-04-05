@@ -4,7 +4,7 @@ package libdatamanager
 func (libdm LibDM) Login(username, password string) (*LoginResponse, error) {
 	var response LoginResponse
 
-	// Do request
+	// Do http request
 	resp, err := NewRequest(EPLogin, CredentialsRequest{
 		Password:  password,
 		Username:  username,
@@ -21,7 +21,7 @@ func (libdm LibDM) Login(username, password string) (*LoginResponse, error) {
 
 // Register create a new account. Return true on success
 func (libdm LibDM) Register(username, password string) (*RestRequestResponse, error) {
-	// Do request
+	// Do http request
 	resp, err := NewRequest(EPRegister, CredentialsRequest{
 		Username: username,
 		Password: password,

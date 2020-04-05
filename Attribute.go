@@ -39,11 +39,12 @@ func (libdm LibDM) attributeRequest(attribute Attribute, action uint8, namespace
 		request.NewName = newName[0]
 	}
 
-	// Make http request
-	resp, err := NewRequest(endpoint, request, libdm.Config).WithAuthFromConfig().Do(nil)
+	var resp *RestRequestResponse
+	var err error
 
-	if err != nil || resp.Status == ResponseError {
-		return nil, NewErrorFromResponse(resp)
+	// Do http request
+	if resp, err = libdm.Request(endpoint, &request, nil, true); err != nil {
+		return nil, err
 	}
 
 	return resp, nil
