@@ -38,6 +38,14 @@ type FileResponseItem struct {
 	Encryption   string         `json:"e"`
 }
 
+type FileChanges struct {
+	NewName                  string
+	NewNamespace             string
+	AddTags, AddGroups       []string
+	RemoveTags, RemoveGroups []string
+	SetPublic, SetPrivate    bool
+}
+
 // DeleteFile deletes the desired file(s)
 func (libdm LibDM) DeleteFile(name string, id uint, all bool, attributes FileAttributes) (*CountResponse, error) {
 	var response CountResponse
@@ -147,6 +155,7 @@ func (libdm LibDM) DownloadFileToReader(name string, id uint, namespace string) 
 	return resp.Body, serverFileName, nil
 }
 
+// DownloadFile downloads and saves a file to the given localFilePath. If the file exists, it will be overwritten
 func (libdm LibDM) DownloadFile(name string, id uint, namespace, localFilePath string, appendFilename ...bool) error {
 	// Download file from server
 	rcl, name, err := libdm.DownloadFileToReader(name, id, namespace)
@@ -175,4 +184,45 @@ func (libdm LibDM) DownloadFile(name string, id uint, namespace, localFilePath s
 	}
 
 	return nil
+}
+
+// UpdateFile updates a file on the server
+func (libdm LibDM) UpdateFile(name string, id uint, namespace string, all bool, changes FileChanges) (*CountResponse, error) {
+	// Set attributes
+	attributes := FileAttributes{
+		Namespace: namespace,
+	}
+
+	var isPublic string
+	if changes.SetPublic {
+		isPublic = "true"
+	}
+	if changes.SetPrivate {
+		isPublic = "false"
+	}
+
+	// Set fileUpdates
+	fileUpdates := FileUpdateItem{
+		IsPublic:     isPublic,
+		NewName:      changes.NewName,
+		NewNamespace: changes.NewNamespace,
+		RemoveTags:   changes.RemoveTags,
+		RemoveGroups: changes.RemoveGroups,
+		AddTags:      changes.AddTags,
+		AddGroups:    changes.AddGroups,
+	}
+
+	var response CountResponse
+
+	if _, err := libdm.Request(EPFileUpdate, &FileRequest{
+		Name:       name,
+		FileID:     id,
+		All:        all,
+		Updates:    fileUpdates,
+		Attributes: attributes,
+	}, &response, true); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
 }
