@@ -1,7 +1,11 @@
 package libdatamanager
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"io"
+	"log"
+	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -225,4 +229,135 @@ func (libdm LibDM) UpdateFile(name string, id uint, namespace string, all bool, 
 	}
 
 	return &response, nil
+}
+
+// NopNoProxyWriter use to fill proxyWriter arg in UpdloadFile
+var NoProxyWriter = func(w io.Writer) io.Writer {
+	return w
+}
+
+// UploadFile uploads the given file to the server and set's its affiliations
+// strargs:
+// [0] public name
+// [1] encryption
+// [2] encryptionKey
+func (libdm LibDM) UploadFile(localFile, name string, public bool, replaceFile uint, attributes FileAttributes, proxyWriter func(w io.Writer) io.Writer, fsDetermined chan int64, strArgs ...string) (*UploadResponse, error) {
+	if replaceFile < 0 {
+		replaceFile = 0
+	}
+
+	var encryption, encryptionKey, publicName string
+	if len(strArgs) > 0 {
+		publicName = strArgs[0]
+	}
+	if len(strArgs) > 1 {
+		encryption = strArgs[1]
+	}
+	if len(strArgs) > 2 {
+		encryptionKey = strArgs[2]
+	}
+
+	// Bulid request
+	request := UploadRequest{
+		Name:        name,
+		Attributes:  attributes,
+		Public:      public,
+		PublicName:  publicName,
+		Encryption:  encryption,
+		ReplaceFile: replaceFile,
+	}
+
+	var contentType string
+	var body io.Reader
+	body, contentType, request.Size = FileUploader(localFile, proxyWriter, encryption, encryptionKey)
+	if fsDetermined != nil {
+		fsDetermined <- request.Size
+	}
+
+	// Make json header content
+	rbody, err := json.Marshal(request)
+	if err != nil {
+		return nil, &ResponseErr{
+			Err: err,
+		}
+	}
+
+	rBase := base64.StdEncoding.EncodeToString(rbody)
+
+	// Do request
+	var resStruct UploadResponse
+	response, err := NewRequest(EPFileUpload, body, libdm.Config).
+		WithMethod(PUT).
+		WithAuth(Authorization{
+			Type:    Bearer,
+			Palyoad: libdm.Config.SessionToken,
+		}).WithHeader(HeaderRequest, rBase).
+		WithRequestType(RawRequestType).
+		WithContentType(ContentType(contentType)).
+		Do(&resStruct)
+
+	if err != nil || response.Status == ResponseError {
+		return nil, NewErrorFromResponse(response)
+	}
+
+	return &resStruct, nil
+}
+
+var Boundary = "MachliJalKiRaniHaiJeevanUskaPaaniHai"
+
+func FileUploader(path string, proxyWriter func(io.Writer) io.Writer, encryption, encryptionKey string) (r *io.PipeReader, contentType string, size int64) {
+	// Open file
+	f, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Retrieve fileSize
+	fi, err := f.Stat()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Encrypt file if required
+	reader, ln, err := getFileEncrypter(path, f, encryption, encryptionKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if ln > 0 {
+		size = ln
+	} else {
+		size = fi.Size()
+	}
+
+	r, w := io.Pipe()
+	mpw := multipart.NewWriter(w)
+	mpw.SetBoundary(Boundary)
+	contentType = mpw.FormDataContentType()
+
+	go func() {
+		part, err := mpw.CreateFormFile("file", fi.Name())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Allow overwriting the part writer for eg. A progressbar
+		part = proxyWriter(part)
+		buf := make([]byte, 512)
+
+		//_, err = io.CopyBuffer(part, reader, buf)
+		for {
+			n, err := reader.Read(buf)
+			if err != nil {
+				break
+			}
+			part.Write(buf[:n])
+		}
+
+		w.Close()
+		f.Close()
+		mpw.Close()
+	}()
+
+	return
 }
