@@ -12,6 +12,8 @@ var (
 	ErrInvalidAuthorizationMethod = errors.New("Invalid request authorization method")
 	// ErrNonOkResponsecode if requests responsecode is non http.ok
 	ErrNonOkResponsecode = errors.New("non ok response")
+	// ErrResponseError response returned an error
+	ErrResponseError = errors.New("Response returned an error")
 )
 
 // ResponseErr response error

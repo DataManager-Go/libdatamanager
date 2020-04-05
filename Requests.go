@@ -84,9 +84,11 @@ const (
 
 // RequestConfig configurations for requests
 type RequestConfig struct {
-	IgnoreCert bool
-	URL        string
-	MachineID  string
+	IgnoreCert   bool
+	URL          string
+	MachineID    string
+	Username     string
+	SessionToken string
 }
 
 // Request a rest server request
