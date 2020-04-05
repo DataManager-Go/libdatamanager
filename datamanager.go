@@ -11,3 +11,18 @@ func NewLibDM(config *RequestConfig) *LibDM {
 		Config: config,
 	}
 }
+
+// Request do a request using libdm
+func (libdm LibDM) Request(ep Endpoint, payload, response interface{}, authorized bool) (interface{}, error) {
+	req := NewRequest(ep, payload, libdm.Config)
+	if authorized {
+		req.WithAuthFromConfig()
+	}
+	resp, err := req.Do(response)
+
+	if err != nil || resp.Status == ResponseError {
+		return nil, NewErrorFromResponse(resp, err)
+	}
+
+	return &resp, nil
+}

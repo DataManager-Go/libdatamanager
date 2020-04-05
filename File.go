@@ -33,3 +33,38 @@ type FileResponseItem struct {
 	Attributes   FileAttributes `json:"attrib"`
 	Encryption   string         `json:"e"`
 }
+
+// DeleteFile deletes the desired file(s)
+func (libdm LibDM) DeleteFile(name string, id uint, all bool, attributes FileAttributes) (*CountResponse, error) {
+	var response CountResponse
+
+	if _, err := libdm.Request(EPFileDelete, &FileRequest{
+		Name:       name,
+		FileID:     id,
+		All:        all,
+		Attributes: attributes,
+	}, &response, true); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+// ListFiles lists the files corresponding to the args
+func (libdm LibDM) ListFiles(name string, id uint, allNamespaces bool, attributes FileAttributes, verbose uint8) (*FileListResponse, error) {
+	var response FileListResponse
+
+	if _, err := libdm.Request(EPFileList, &FileListRequest{
+		FileID:        id,
+		Name:          name,
+		AllNamespaces: allNamespaces,
+		Attributes:    attributes,
+		OptionalParams: OptionalRequetsParameter{
+			Verbose: verbose,
+		},
+	}, &response, true); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}

@@ -24,12 +24,8 @@ func (libdm LibDM) namespaceRequest(action uint8, name, newName string, customNs
 		Type:      nsType,
 	}, libdm.Config).WithAuthFromConfig().Do(&response)
 
-	if err != nil {
+	if err != nil || resp.Status == ResponseError {
 		return nil, NewErrorFromResponse(resp)
-	}
-
-	if resp.Status == ResponseError {
-		return nil, ErrResponseError
 	}
 
 	return &response, nil
@@ -56,12 +52,8 @@ func (libdm LibDM) GetNamespaces() (*StringSliceResponse, error) {
 
 	response, err := NewRequest(EPNamespaceList, nil, libdm.Config).WithAuthFromConfig().Do(&resp)
 
-	if err != nil {
+	if err != nil || response.Status == ResponseError {
 		return nil, NewErrorFromResponse(response)
-	}
-
-	if response.Status == ResponseError {
-		return nil, ErrResponseError
 	}
 
 	return &resp, nil

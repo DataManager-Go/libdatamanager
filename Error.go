@@ -18,34 +18,50 @@ var (
 
 // ResponseErr response error
 type ResponseErr struct {
-	HTTPStatusCode   int
-	ResopnseMessage  string
-	ReceivedResponse bool
-	Err              error
+	Response *RestRequestResponse
+	Err      error
 }
 
 func (reserr *ResponseErr) Error() string {
-	return fmt.Sprintf("HTTPCode: %d; Status: %s", reserr.HTTPStatusCode, reserr.ResopnseMessage)
+	if reserr.Response != nil {
+		return fmt.Sprintf("HTTPCode: %d; Message: %s", reserr.Response.HTTPCode, reserr.Response.Message)
+	}
+	if reserr.Err != nil {
+		return reserr.Err.Error()
+	}
+
+	return "Unexpected error"
 }
 
 // NewErrorFromResponse return error from response
 func NewErrorFromResponse(r *RestRequestResponse, err ...error) *ResponseErr {
-	var e error
+	var (
+		responseErr ResponseErr
+		e           error
+	)
 
+	// use e if err passed
 	if len(err) > 0 && err[0] != nil {
 		e = err[0]
 	}
 
-	if r != nil && r.HTTPCode != 0 {
-		return &ResponseErr{
-			ReceivedResponse: true,
-			HTTPStatusCode:   r.HTTPCode,
-			ResopnseMessage:  r.Message,
-			Err:              e,
+	// Check if http.Request was successful
+	if r != nil {
+		// Server throw an error
+		if r.Status == ResponseError && e == nil {
+			e = ErrResponseError
+		}
+
+		responseErr = ResponseErr{
+			Response: r,
+			Err:      e,
+		}
+	} else {
+		// http.Request throw an error
+		responseErr = ResponseErr{
+			Err: e,
 		}
 	}
 
-	return &ResponseErr{
-		Err: e,
-	}
+	return &responseErr
 }

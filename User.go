@@ -11,17 +11,12 @@ func (libdm LibDM) Login(username, password string) (*LoginResponse, error) {
 		MachineID: libdm.Config.MachineID,
 	}, libdm.Config).Do(&response)
 
-	if err != nil {
+	// Return new error on ... error
+	if err != nil || resp.Status == ResponseError {
 		return nil, NewErrorFromResponse(resp, err)
 	}
 
-	if resp.Status == ResponseError {
-		return nil, NewErrorFromResponse(resp)
-	} else if resp.Status == ResponseSuccess {
-		return &response, nil
-	}
-
-	return nil, nil
+	return &response, nil
 }
 
 // Register create a new account. Return true on success

@@ -34,7 +34,7 @@ func (libdm LibDM) attributeRequest(attribute Attribute, action uint8, namespace
 		Namespace: namespace,
 	}
 
-	// Add new name on update request
+	// Set NewName on update request
 	if action == 1 {
 		request.NewName = newName[0]
 	}
@@ -42,12 +42,8 @@ func (libdm LibDM) attributeRequest(attribute Attribute, action uint8, namespace
 	// Make http request
 	resp, err := NewRequest(endpoint, request, libdm.Config).WithAuthFromConfig().Do(nil)
 
-	if err != nil {
+	if err != nil || resp.Status == ResponseError {
 		return nil, NewErrorFromResponse(resp)
-	}
-
-	if resp.Status == ResponseError {
-		return resp, ErrResponseError
 	}
 
 	return resp, nil
