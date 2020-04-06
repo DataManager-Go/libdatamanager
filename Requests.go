@@ -69,10 +69,12 @@ const (
 	EPAttributeTag = EPAttribute + "/tag"
 	EPTagUpdate    = EPAttributeTag + "/update"
 	EPTagDelete    = EPAttributeTag + "/delete"
+	EPTags         = EPAttributeTag + "/get"
 	// Group
 	EPAttributeGroup = EPAttribute + "/group"
 	EPGroupUpdate    = EPAttributeGroup + "/update"
 	EPGroupDelete    = EPAttributeGroup + "/delete"
+	EPGroups         = EPAttributeGroup + "/get"
 
 	// Namespace
 	EPNamespace       Endpoint = "/namespace"
