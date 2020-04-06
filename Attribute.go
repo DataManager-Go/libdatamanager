@@ -70,6 +70,7 @@ func (libdm LibDM) DeleteAttribute(attribute Attribute, namespace, name string) 
 	return libdm.attributeRequest(attribute, 0, namespace, name, nil)
 }
 
+// GetTags returns an array of attributes containing tags available in given namespace
 func (libdm LibDM) GetTags(namespace string) ([]Attribute, error) {
 	var attributes []Attribute
 	_, err := libdm.attributeRequest(TagAttribute, 2, namespace, "", &attributes)
@@ -79,6 +80,7 @@ func (libdm LibDM) GetTags(namespace string) ([]Attribute, error) {
 	return attributes, nil
 }
 
+// GetGroups returns an array of attributes containing groups available in given namespace
 func (libdm LibDM) GetGroups(namespace string) ([]Attribute, error) {
 	var attributes []Attribute
 	_, err := libdm.attributeRequest(GroupAttribute, 2, namespace, "", &attributes)

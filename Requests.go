@@ -93,6 +93,7 @@ type RequestConfig struct {
 	SessionToken string
 }
 
+// GetBearerAuth returns bearer authorization from config
 func (rc RequestConfig) GetBearerAuth() Authorization {
 	return Authorization{
 		Type:    Bearer,

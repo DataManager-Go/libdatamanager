@@ -71,6 +71,7 @@ func IsValidCipher(c string) bool {
 	return false
 }
 
+// Encrypt encrypts input stream and writes it to out
 func Encrypt(in io.Reader, out io.Writer, keyAes, buff []byte) (err error) {
 	iv := make([]byte, 16)
 	_, err = rand.Read(iv)

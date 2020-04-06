@@ -2,6 +2,7 @@ package libdatamanager
 
 import (
 	"bytes"
+	"crypto/aes"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
@@ -46,6 +47,7 @@ type FileResponseItem struct {
 	Encryption   string         `json:"e"`
 }
 
+// FileChanges file changes for updating a file
 type FileChanges struct {
 	NewName                  string
 	NewNamespace             string
@@ -120,7 +122,7 @@ func (libdm LibDM) PublishFile(name string, id uint, publicName string, all bool
 	return resp, nil
 }
 
-// DownloadFileToReader returns a readCloser for the request body == file content
+// GetFile returns a readCloser for the request body == file content
 // Body must be closed
 func (libdm LibDM) GetFile(name string, id uint, namespace string) (*http.Response, string, error) {
 	resp, err := NewRequest(EPFileGet, &FileRequest{
@@ -235,7 +237,7 @@ func (libdm LibDM) UpdateFile(name string, id uint, namespace string, all bool, 
 	return &response, nil
 }
 
-// NopNoProxyWriter use to fill proxyWriter arg in UpdloadFile
+// NoProxyWriter use to fill proxyWriter arg in UpdloadFile
 var NoProxyWriter = func(w io.Writer) io.Writer {
 	return w
 }
@@ -282,9 +284,19 @@ func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, 
 
 		contentType = string(JSONContentType)
 	} else {
+		// Open file
+		f, err := os.Open(path)
+		if err != nil {
+			// Write 0 into channel to prevent deatlocks
+			if fsDetermined != nil {
+				fsDetermined <- 0
+			}
+			return nil, &ResponseErr{Err: err}
+		}
+
 		// Init upload stuff
 		request.UploadType = FileUploadType
-		body, contentType, request.Size = FileUploader(path, proxyWriter, encryption, encryptionKey, done)
+		body, contentType, request.Size = FileUploader(f, proxyWriter, encryption, encryptionKey, done)
 	}
 
 	if fsDetermined != nil {
@@ -317,19 +329,25 @@ func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, 
 	return &resStruct, nil
 }
 
+// Boundary boundary for the part
 var Boundary = "MachliJalKiRaniHaiJeevanUskaPaaniHai"
 
-func FileUploader(path string, proxyWriter func(io.Writer) io.Writer, encryption, encryptionKey string, done chan int8) (r *io.PipeReader, contentType string, size int64) {
-	// Open file
-	f, err := os.Open(path)
+// FileUploader upload a file directly
+func FileUploader(f *os.File, proxyWriter func(io.Writer) io.Writer, encryption, encryptionKey string, done chan int8) (r *io.PipeReader, contentType string, size int64) {
+	// Retrieve file stats
+	fi, err := f.Stat()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Retrieve fileSize
-	fi, err := f.Stat()
-	if err != nil {
-		log.Fatal(err)
+	// Set filesize
+	switch encryption {
+	case EncryptionCiphers[0]:
+		size = fi.Size() + aes.BlockSize
+	case "":
+		size = fi.Size()
+	default:
+		return nil, "", -1
 	}
 
 	r, w := io.Pipe()
@@ -349,7 +367,7 @@ func FileUploader(path string, proxyWriter func(io.Writer) io.Writer, encryption
 		part = proxyWriter(part)
 		part = io.MultiWriter(part, hasher)
 
-		buf := make([]byte, 4*1024)
+		buf := make([]byte, 10*1024)
 
 		switch encryption {
 		case EncryptionCiphers[0]:
