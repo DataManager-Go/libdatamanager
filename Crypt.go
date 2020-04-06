@@ -1,15 +1,10 @@
 package libdatamanager
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"errors"
-	"fmt"
 	"io"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"strings"
 )
@@ -76,105 +71,37 @@ func IsValidCipher(c string) bool {
 	return false
 }
 
-func respToDecrypted(resp *http.Response, encryptionKey string) (io.Reader, error) {
-	var reader io.Reader
-
-	key := []byte(encryptionKey)
-	if len(key) == 0 && len(resp.Header.Get(HeaderEncryption)) > 0 {
-		fmt.Println("Error: file is encrypted but no key was given. To ignore this use --no-decrypt")
-		os.Exit(1)
+func Encrypt(in io.Reader, out io.Writer, keyAes, buff []byte) (err error) {
+	iv := make([]byte, 16)
+	_, err = rand.Read(iv)
+	if err != nil {
+		return err
 	}
 
-	switch resp.Header.Get(HeaderEncryption) {
-	case EncryptionCiphers[0]:
-		{
-			// AES
+	aes, err := aes.NewCipher(keyAes)
+	if err != nil {
+		return err
+	}
 
-			// Read response
-			text, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				return nil, err
-			}
+	ctr := cipher.NewCTR(aes, iv)
+	out.Write(iv)
 
-			// Create Cipher
-			block, err := aes.NewCipher(key)
-			if err != nil {
-				panic(err)
-			}
-
-			// Validate text length
-			if len(text) < aes.BlockSize {
-				fmt.Printf("Error!\n")
-				os.Exit(0)
-			}
-
-			iv := text[:aes.BlockSize]
-			text = text[aes.BlockSize:]
-
-			// Decrypt
-			cfb := cipher.NewCFBDecrypter(block, iv)
-			cfb.XORKeyStream(text, text)
-
-			reader = bytes.NewReader(decodeBase64(text))
+	for {
+		n, err := in.Read(buff)
+		if err != nil && err != io.EOF {
+			return err
 		}
-	case "":
-		{
-			reader = resp.Body
+
+		if n != 0 {
+			outBuf := make([]byte, n)
+			ctr.XORKeyStream(outBuf, buff[:n])
+			out.Write(outBuf)
 		}
-	default:
-		{
-			return nil, errors.New("Cipher not supported")
+
+		if err == io.EOF {
+			break
 		}
 	}
 
-	return reader, nil
-}
-
-// returns a reader to the correct source of data
-func getFileEncrypter(filename string, fh *os.File, encryption, encryptionKey string) (io.Reader, int64, error) {
-	var reader io.Reader
-	var ln int64
-	switch encryption {
-	case EncryptionCiphers[0]:
-		{
-			// AES
-			block, err := aes.NewCipher([]byte(encryptionKey))
-			if err != nil {
-				return nil, 0, err
-			}
-
-			// Get file content
-			b, err := fileToBase64(filename, fh)
-			if err != nil {
-				return nil, 0, err
-			}
-
-			// Set Ciphertext 0->16 to Iv
-			ciphertext := make([]byte, aes.BlockSize+len(b))
-			iv := ciphertext[:aes.BlockSize]
-			if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-				return nil, 0, err
-			}
-
-			// Encrypt file
-			cfb := cipher.NewCFBEncrypter(block, iv)
-			cfb.XORKeyStream(ciphertext[aes.BlockSize:], b)
-
-			// Set reader to reader from bytes
-			reader = bytes.NewReader(ciphertext)
-			ln = int64(len(ciphertext))
-		}
-	case "":
-		{
-			// Set reader to reader of file
-			reader = fh
-		}
-	default:
-		{
-			// Return error if cipher is not implemented
-			return nil, 0, errors.New("cipher not supported")
-		}
-	}
-
-	return reader, ln, nil
+	return nil
 }

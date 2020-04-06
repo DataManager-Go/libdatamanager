@@ -1,6 +1,8 @@
 package libdatamanager
 
 import (
+	"bytes"
+	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
 	"io"
@@ -330,18 +332,6 @@ func FileUploader(path string, proxyWriter func(io.Writer) io.Writer, encryption
 		log.Fatal(err)
 	}
 
-	// Encrypt file if required
-	reader, ln, err := getFileEncrypter(path, f, encryption, encryptionKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if ln > 0 {
-		size = ln
-	} else {
-		size = fi.Size()
-	}
-
 	r, w := io.Pipe()
 	mpw := multipart.NewWriter(w)
 	mpw.SetBoundary(Boundary)
@@ -353,17 +343,35 @@ func FileUploader(path string, proxyWriter func(io.Writer) io.Writer, encryption
 			log.Fatal(err)
 		}
 
+		hasher := md5.New()
+
 		// Allow overwriting the part writer for eg. A progressbar
 		part = proxyWriter(part)
-		buf := make([]byte, 512)
+		part = io.MultiWriter(part, hasher)
 
-		//_, err = io.CopyBuffer(part, reader, buf)
-		for {
-			n, err := reader.Read(buf)
-			if err != nil {
-				break
+		buf := make([]byte, 4*1024)
+
+		switch encryption {
+		case EncryptionCiphers[0]:
+			{
+				err = Encrypt(f, part, []byte(encryptionKey), buf)
 			}
-			part.Write(buf[:n])
+		case "":
+			{
+				_, err = io.CopyBuffer(part, f, buf)
+			}
+		}
+
+		if err != nil && err != io.EOF {
+			log.Panicln(err)
+		}
+
+		// Append md5
+		sum := hasher.Sum(nil)
+		_, err = io.Copy(part, bytes.NewBuffer(sum))
+
+		if err != nil && err != io.EOF {
+			log.Panicln(err)
 		}
 
 		w.Close()
