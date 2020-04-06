@@ -350,6 +350,9 @@ func FileUploader(f *os.File, proxyWriter func(io.Writer) io.Writer, encryption,
 		return nil, "", -1
 	}
 
+	// 16 additional checksum bytes
+	size += 16
+
 	r, w := io.Pipe()
 	mpw := multipart.NewWriter(w)
 	mpw.SetBoundary(Boundary)
