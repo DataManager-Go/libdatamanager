@@ -29,6 +29,8 @@ const (
 	HeaderEncryption string = "X-Encryption"
 	// HeaderContentLength request content length
 	HeaderContentLength string = "ContentLength"
+	// HeaderFileID fileid header
+	HeaderFileID string = "X-FileID"
 )
 
 // LoginResponse response for login

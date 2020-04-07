@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -28,6 +29,13 @@ const (
 	// Keyring constants
 	DefaultKeyring     = "login"
 	KeyringServiceName = "DataManagerCLI"
+)
+
+var (
+	// ErrUnlockingKeyring error if keyring is available but can't be unlocked
+	ErrUnlockingKeyring = errors.New("Error unlocking keyring")
+	// ErrKeystoreNoDir error if keystore is no directory
+	ErrKeystoreNoDir = errors.New("Keystore is not a directory")
 )
 
 // Config Configuration structure
@@ -58,6 +66,7 @@ type clientConfig struct {
 	MinFilesToDisplay uint16 `required:"true"`
 	AutoFilePreview   bool
 	TrimNameAfter     int
+	KeyStoreDir       string
 	Defaults          clientDefaults
 }
 
@@ -90,7 +99,7 @@ func getDefaultConfig() Config {
 		},
 		Client: clientConfig{
 			MinFilesToDisplay: 100,
-			AutoFilePreview:   true,
+			AutoFilePreview:   false,
 			Defaults: clientDefaults{
 				DefaultDetails: 0,
 				DefaultOrder:   "created/r",
@@ -340,7 +349,8 @@ func (config Config) IsDefault() bool {
 	return config.Client == defaultConfig.Client &&
 		config.User == defaultConfig.User &&
 		config.Server.IgnoreCert == defaultConfig.Server.IgnoreCert &&
-		config.Server.AlternativeURL == config.Server.AlternativeURL
+		config.Server.AlternativeURL == config.Server.AlternativeURL &&
+		config.Client.KeyStoreDir == defaultConfig.Client.KeyStoreDir
 }
 
 // MustGetRequestConfig create a libdm requestconfig from given cli client config and fatal on error
@@ -374,6 +384,27 @@ func (config Config) ToRequestConfig() (*libdatamanager.RequestConfig, error) {
 		SessionToken: token,
 		Username:     config.User.Username,
 	}, nil
+}
+
+// KeystoreEnabled return true if user wants to save keyfiles
+// in a specified directory
+func (config *Config) KeystoreEnabled() bool {
+	return len(config.Client.KeyStoreDir) > 0
+}
+
+// KeystoreDirValid return true if keystore is valid
+func (config *Config) KeystoreDirValid() error {
+	s, err := os.Stat(config.Client.KeyStoreDir)
+	if err != nil {
+		return err
+	}
+
+	// KeyStoreDir must be a directory
+	if !s.IsDir() {
+		return ErrKeystoreNoDir
+	}
+
+	return nil
 }
 
 // GenMachineID detect the machineID.
