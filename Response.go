@@ -83,3 +83,8 @@ type BulkPublishResponse struct {
 type CountResponse struct {
 	Count uint32 `json:"count"`
 }
+
+// IDsResponse response containing a list of ids
+type IDsResponse struct {
+	IDs []uint `json:"ids"`
+}

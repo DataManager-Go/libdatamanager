@@ -57,8 +57,8 @@ type FileChanges struct {
 }
 
 // DeleteFile deletes the desired file(s)
-func (libdm LibDM) DeleteFile(name string, id uint, all bool, attributes FileAttributes) (*CountResponse, error) {
-	var response CountResponse
+func (libdm LibDM) DeleteFile(name string, id uint, all bool, attributes FileAttributes) (*IDsResponse, error) {
+	var response IDsResponse
 
 	if _, err := libdm.Request(EPFileDelete, &FileRequest{
 		Name:       name,

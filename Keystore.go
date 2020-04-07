@@ -75,8 +75,12 @@ func (store *Keystore) AddKey(fileID uint, keyPath string) error {
 }
 
 // DeleteKey Inserts key into keystore
-func (store *Keystore) DeleteKey(fileID uint) error {
-	return store.DB.Unscoped().Where("file_id=?", fileID).Delete(&KeystoreFile{}).Error
+func (store *Keystore) DeleteKey(fileID uint) (*KeystoreFile, error) {
+	file, err := store.GetKeyFile(fileID)
+	if err != nil {
+		return nil, err
+	}
+	return file, store.DB.Unscoped().Delete(&file).Error
 }
 
 // GetKeyFile returns a keyfile with assigned to the fileID
