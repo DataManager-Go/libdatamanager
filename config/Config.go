@@ -328,7 +328,7 @@ func (config *Config) GetToken() (string, error) {
 		}
 
 		// Otherwise return the error and sessiontoken
-		return config.User.SessionToken, err
+		return config.User.SessionToken, nil
 	}
 
 	return token, nil
