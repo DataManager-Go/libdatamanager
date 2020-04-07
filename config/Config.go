@@ -1,4 +1,4 @@
-package libdatamanager
+package config
 
 import (
 	"fmt"
