@@ -8,6 +8,7 @@ import (
 	"os/user"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/DataManager-Go/libdatamanager"
 	"github.com/JojiiOfficial/configService"
@@ -301,14 +302,36 @@ func (config *Config) MustSetToken(token string) {
 }
 
 // GetToken returns user token
-func (config *Config) GetToken() string {
+func (config *Config) GetToken() (string, error) {
 	token, err := keyring.Get(KeyringServiceName, config.User.Username)
 
 	if config.User.DisableKeyring || err != nil {
-		return config.User.SessionToken
+		// Return unlock error if sessiontoken is empty,
+		// to allow using the unencrypted version
+		if IsUnlockError(err) && len(config.User.SessionToken) == 0 {
+			return "", ErrUnlockingKeyring
+		}
+
+		// If keyring can be opened, but key was not found
+		// Return error
+		if err == keyring.ErrNotFound {
+			return "", err
+		}
+
+		// Otherwise return the error and sessiontoken
+		return config.User.SessionToken, err
 	}
 
-	return token
+	return token, nil
+}
+
+// IsUnlockError return true if err is unlock error
+func IsUnlockError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return strings.HasPrefix(err.Error(), "failed to unlock correct collection") || err == ErrUnlockingKeyring
 }
 
 // IsDefault returns true if config is equal to the default config
@@ -320,15 +343,37 @@ func (config Config) IsDefault() bool {
 		config.Server.AlternativeURL == config.Server.AlternativeURL
 }
 
-// ToRequestConfig create a libdm requestconfig from given cli client config
-func (config Config) ToRequestConfig() *libdatamanager.RequestConfig {
+// MustGetRequestConfig create a libdm requestconfig from given cli client config and fatal on error
+func (config Config) MustGetRequestConfig() *libdatamanager.RequestConfig {
+	token, err := config.GetToken()
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
+
 	return &libdatamanager.RequestConfig{
 		MachineID:    config.GetMachineID(),
 		URL:          config.Server.URL,
 		IgnoreCert:   config.Server.IgnoreCert,
-		SessionToken: config.GetToken(),
+		SessionToken: token,
 		Username:     config.User.Username,
 	}
+}
+
+// ToRequestConfig create a libdm requestconfig from given cli client config
+func (config Config) ToRequestConfig() (*libdatamanager.RequestConfig, error) {
+	token, err := config.GetToken()
+	if err != nil {
+		return nil, err
+	}
+
+	return &libdatamanager.RequestConfig{
+		MachineID:    config.GetMachineID(),
+		URL:          config.Server.URL,
+		IgnoreCert:   config.Server.IgnoreCert,
+		SessionToken: token,
+		Username:     config.User.Username,
+	}, nil
 }
 
 // GenMachineID detect the machineID.
