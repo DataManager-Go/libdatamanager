@@ -371,19 +371,16 @@ func (config Config) MustGetRequestConfig() *libdatamanager.RequestConfig {
 }
 
 // ToRequestConfig create a libdm requestconfig from given cli client config
+// If token is not set, error has a value and token is equal to an empty string
 func (config Config) ToRequestConfig() (*libdatamanager.RequestConfig, error) {
 	token, err := config.GetToken()
-	if err != nil {
-		return nil, err
-	}
-
 	return &libdatamanager.RequestConfig{
 		MachineID:    config.GetMachineID(),
 		URL:          config.Server.URL,
 		IgnoreCert:   config.Server.IgnoreCert,
 		SessionToken: token,
 		Username:     config.User.Username,
-	}, nil
+	}, err
 }
 
 // KeystoreEnabled return true if user wants to save keyfiles
