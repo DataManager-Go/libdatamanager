@@ -323,7 +323,7 @@ func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, 
 		Do(&resStruct)
 
 	if err != nil || response.Status == ResponseError {
-		return nil, NewErrorFromResponse(response)
+		return nil, NewErrorFromResponse(response, err)
 	}
 
 	return &resStruct, nil
