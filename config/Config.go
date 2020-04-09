@@ -50,10 +50,12 @@ type Config struct {
 }
 
 type userConfig struct {
-	Username       string
-	SessionToken   string
-	DisableKeyring bool
-	Keyring        string
+	Username           string
+	SessionToken       string
+	DisableKeyring     bool
+	Keyring            string
+	ForceVerify        bool
+	DeleteInvaildFiles bool
 }
 
 type serverConfig struct {
@@ -94,8 +96,10 @@ func getDefaultConfig() Config {
 			IgnoreCert: false,
 		},
 		User: userConfig{
-			DisableKeyring: false,
-			Keyring:        DefaultKeyring,
+			DisableKeyring:     false,
+			Keyring:            DefaultKeyring,
+			ForceVerify:        false,
+			DeleteInvaildFiles: true,
 		},
 		Client: clientConfig{
 			MinFilesToDisplay: 100,
