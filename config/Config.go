@@ -34,8 +34,6 @@ const (
 var (
 	// ErrUnlockingKeyring error if keyring is available but can't be unlocked
 	ErrUnlockingKeyring = errors.New("Error unlocking keyring")
-	// ErrKeystoreNoDir error if keystore is no directory
-	ErrKeystoreNoDir = errors.New("Keystore is not a directory")
 )
 
 // Config Configuration structure
@@ -174,7 +172,7 @@ func InitConfig(defaultFile, file string) (*Config, error) {
 func (config *Config) SetMachineID() {
 	if len(config.MachineID) == 0 {
 		config.MachineID = GenMachineID()
-		configService.Save(config, config.File)
+		config.Save()
 	}
 }
 
@@ -304,7 +302,7 @@ func (config *Config) SetToken(token string) error {
 
 	// Save sessiontoken in config unencrypted
 	config.User.SessionToken = token
-	return configService.Save(config, config.File)
+	return config.Save()
 }
 
 // MustSetToken fatals on error
@@ -393,7 +391,7 @@ func (config *Config) KeystoreEnabled() bool {
 	return len(config.Client.KeyStoreDir) > 0
 }
 
-// KeystoreDirValid return true if keystore is valid
+// KeystoreDirValid return nil if keystore is valid
 func (config *Config) KeystoreDirValid() error {
 	s, err := os.Stat(config.Client.KeyStoreDir)
 	if err != nil {
@@ -402,10 +400,43 @@ func (config *Config) KeystoreDirValid() error {
 
 	// KeyStoreDir must be a directory
 	if !s.IsDir() {
-		return ErrKeystoreNoDir
+		return libdatamanager.ErrKeystoreNoDir
 	}
 
 	return nil
+}
+
+// Save saves the config
+func (config *Config) Save() error {
+	return configService.Save(config, config.File)
+}
+
+// SetKeystoreDir sets new KeyStoreDir and saves the config
+func (config *Config) SetKeystoreDir(newDir string) error {
+	config.Client.KeyStoreDir = newDir
+	return config.Save()
+}
+
+// UnsetKeystoreDir removes keystore dir from confi
+// and saves it
+func (config *Config) UnsetKeystoreDir() error {
+	return config.SetKeystoreDir("")
+}
+
+// GetKeystore returns the keystore assigned to the config
+func (config *Config) GetKeystore() (*libdatamanager.Keystore, error) {
+	if err := config.KeystoreDirValid(); err != nil {
+		return nil, err
+	}
+
+	// create and open keystore
+	keystore := libdatamanager.NewKeystore(config.Client.KeyStoreDir)
+	err := keystore.Open()
+	if err != nil {
+		return nil, err
+	}
+
+	return keystore, nil
 }
 
 // GenMachineID detect the machineID.

@@ -3,6 +3,7 @@ package libdatamanager
 import (
 	"errors"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/jinzhu/gorm"
@@ -19,6 +20,8 @@ const (
 var (
 	// ErrKeyUnavailable if keystore key is unavailable
 	ErrKeyUnavailable = errors.New("keyring key is unavailable")
+	// ErrKeystoreNoDir error if keystore is no directory
+	ErrKeystoreNoDir = errors.New("Keystore is not a directory")
 )
 
 // KeystoreFile the keystore row
@@ -30,8 +33,9 @@ type KeystoreFile struct {
 
 // Keystore a place to store keys
 type Keystore struct {
-	Path string
-	DB   *gorm.DB
+	Path     string
+	DB       *gorm.DB
+	fileInfo os.FileInfo
 }
 
 // NewKeystore create a new keystore
@@ -53,8 +57,19 @@ func (store *Keystore) GetKeystoreDataFile() string {
 
 // Open opens the keystore
 func (store *Keystore) Open() error {
-	// Open DB into memory
 	var err error
+
+	// Get Info
+	store.fileInfo, err = os.Stat(store.Path)
+	if err != nil {
+		return err
+	}
+
+	if !store.fileInfo.IsDir() {
+		return ErrKeystoreNoDir
+	}
+
+	// Open DB into memory
 	store.DB, err = gorm.Open("sqlite3", store.GetKeystoreDataFile())
 	if err != nil {
 		return err
@@ -110,9 +125,48 @@ func (store *Keystore) GetKey(fileID uint) ([]byte, error) {
 	return ioutil.ReadFile(store.GetKeystoreFile(storefile.Key))
 }
 
+// GetFiles returns a slice containing all keystore Files
+func (store *Keystore) GetFiles() ([]KeystoreFile, error) {
+	var fileitems []KeystoreFile
+
+	// Find files in DB
+	err := store.DB.Find(&fileitems).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return fileitems, nil
+}
+
+// GetValidKeyCount reutrns count of valid keys
+func (store *Keystore) GetValidKeyCount() (int, error) {
+	var validItems int
+
+	// Get files
+	fileitems, err := store.GetFiles()
+	if err != nil {
+		return 0, err
+	}
+
+	// Select valid files
+	for i := range fileitems {
+		_, err := os.Stat(store.GetKeystoreFile(fileitems[i].Key))
+		if err == nil {
+			validItems++
+		}
+	}
+
+	return validItems, nil
+}
+
+// GetFileInfo returns fileinfo for the keystore
+func (store *Keystore) GetFileInfo() *os.FileInfo {
+	return &store.fileInfo
+}
+
 // Close closes the keystore
 func (store *Keystore) Close() {
-	if store.DB == nil {
+	if store == nil || store.DB == nil {
 		return
 	}
 	store.DB.Close()
