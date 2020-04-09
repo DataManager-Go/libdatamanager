@@ -17,20 +17,30 @@ const (
 const (
 	// HeaderStatus headername for status in response
 	HeaderStatus string = "X-Response-Status"
+
 	// HeaderStatusMessage headername for status in response
 	HeaderStatusMessage string = "X-Response-Message"
+
 	// HeaderContentType contenttype of response
 	HeaderContentType string = "Content-Type"
+
 	// HeaderFileName filename header
 	HeaderFileName string = "X-Filename"
+
 	// HeaderRequest request content
 	HeaderRequest string = "Request"
+
 	// HeaderEncryption encryption header
 	HeaderEncryption string = "X-Encryption"
+
 	// HeaderContentLength request content length
 	HeaderContentLength string = "ContentLength"
+
 	// HeaderFileID fileid header
 	HeaderFileID string = "X-FileID"
+
+	// HeaderChecksum files checksum
+	HeaderChecksum string = "Checksum"
 )
 
 // LoginResponse response for login

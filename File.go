@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // FileAttributes attributes for a file
@@ -45,6 +47,7 @@ type FileResponseItem struct {
 	PublicName   string         `json:"pubname"`
 	Attributes   FileAttributes `json:"attrib"`
 	Encryption   string         `json:"e"`
+	Checksum     string         `json:"checksum"`
 }
 
 // FileChanges file changes for updating a file
@@ -122,9 +125,10 @@ func (libdm LibDM) PublishFile(name string, id uint, publicName string, all bool
 	return resp, nil
 }
 
-// GetFile returns a readCloser for the request body == file content
-// Body must be closed
-func (libdm LibDM) GetFile(name string, id uint, namespace string) (*http.Response, string, error) {
+// GetFile requests a filedownload and returns the response
+// -> response, serverfilename, checksum, error
+// The response body must be closed
+func (libdm LibDM) GetFile(name string, id uint, namespace string) (*http.Response, string, string, error) {
 	resp, err := NewRequest(EPFileGet, &FileRequest{
 		Name:   name,
 		FileID: id,
@@ -135,14 +139,14 @@ func (libdm LibDM) GetFile(name string, id uint, namespace string) (*http.Respon
 
 	// Check for error
 	if err != nil {
-		return nil, "", &ResponseErr{
+		return nil, "", "", &ResponseErr{
 			Err: err,
 		}
 	}
 
 	// Check response headers
 	if resp.Header.Get(HeaderStatus) == strconv.Itoa(int(ResponseError)) {
-		return nil, "", &ResponseErr{
+		return nil, "", "", &ResponseErr{
 			Response: &RestRequestResponse{
 				HTTPCode: resp.StatusCode,
 				Headers:  &resp.Header,
@@ -152,27 +156,37 @@ func (libdm LibDM) GetFile(name string, id uint, namespace string) (*http.Respon
 		}
 	}
 
-	// Get filename from response headers
+	// Get filename from headers
 	serverFileName := resp.Header.Get(HeaderFileName)
+	// Get file checksum from headers
+	checksum := resp.Header.Get(HeaderChecksum)
 
 	// Check headers
 	if len(serverFileName) == 0 {
-		return nil, "", &ResponseErr{
+		return nil, "", "", &ResponseErr{
 			Err: ErrResponseFilenameInvalid,
 		}
 	}
 
-	return resp, serverFileName, nil
+	return resp, serverFileName, checksum, nil
 }
+
+var (
+	// ErrChecksumNotMatch error if the checksum of the downloaded
+	// file doesn't match with the checksum of the remote file
+	ErrChecksumNotMatch = errors.New("generated checksum not match")
+)
 
 // DownloadFile downloads and saves a file to the given localFilePath. If the file exists, it will be overwritten
 func (libdm LibDM) DownloadFile(name string, id uint, namespace, localFilePath string, appendFilename ...bool) error {
 	// Download file from server
-	resp, name, err := libdm.GetFile(name, id, namespace)
+	resp, name, checksum, err := libdm.GetFile(name, id, namespace)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	hash := crc32.NewIEEE()
 
 	// Append remote filename if desired
 	if len(appendFilename) > 0 && appendFilename[0] {
@@ -181,16 +195,23 @@ func (libdm LibDM) DownloadFile(name string, id uint, namespace, localFilePath s
 
 	// Create loal file
 	f, err := os.Create(localFilePath)
+	defer f.Close()
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+
+	w := io.MultiWriter(hash, f)
 
 	// Save file to local file
-	buff := make([]byte, 512)
-	_, err = io.CopyBuffer(f, resp.Body, buff)
+	buff := make([]byte, 10*1024)
+	_, err = io.CopyBuffer(w, resp.Body, buff)
 	if err != nil {
 		return err
+	}
+
+	// Check if the checksums are equal, if not return an error
+	if hex.EncodeToString(hash.Sum(nil)) != checksum {
+		return ErrChecksumNotMatch
 	}
 
 	return nil
