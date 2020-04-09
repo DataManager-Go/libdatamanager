@@ -63,11 +63,13 @@ type serverConfig struct {
 }
 
 type clientConfig struct {
-	MinFilesToDisplay uint16 `required:"true"`
-	AutoFilePreview   bool
-	TrimNameAfter     int
-	KeyStoreDir       string
-	Defaults          clientDefaults
+	MinFilesToDisplay    uint16 `required:"true"`
+	AutoFilePreview      bool
+	TrimNameAfter        int
+	KeyStoreDir          string
+	SkipKeystoreCheck    bool
+	HideKeystoreWarnings bool
+	Defaults             clientDefaults
 }
 
 type clientDefaults struct {
@@ -106,7 +108,9 @@ func getDefaultConfig() Config {
 				DefaultDetails: 0,
 				DefaultOrder:   "created/r",
 			},
-			TrimNameAfter: 20,
+			TrimNameAfter:        20,
+			SkipKeystoreCheck:    true,
+			HideKeystoreWarnings: false,
 		},
 		Default: defaultConfig{
 			Namespace: "default",
