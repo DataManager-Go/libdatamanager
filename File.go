@@ -1,11 +1,11 @@
 package libdatamanager
 
 import (
-	"bytes"
 	"crypto/aes"
-	"crypto/md5"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"hash/crc32"
 	"io"
 	"log"
 	"mime/multipart"
@@ -247,7 +247,7 @@ var NoProxyWriter = func(w io.Writer) io.Writer {
 // [0] public name
 // [1] encryption
 // [2] encryptionKey
-func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, attributes FileAttributes, proxyWriter func(w io.Writer) io.Writer, fsDetermined chan int64, done chan int8, strArgs ...string) (*UploadResponse, error) {
+func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, attributes FileAttributes, proxyWriter func(w io.Writer) io.Writer, fsDetermined chan int64, done chan string, strArgs ...string) (*UploadResponse, error) {
 	if replaceFile < 0 {
 		replaceFile = 0
 	}
@@ -333,8 +333,7 @@ func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, 
 var Boundary = "MachliJalKiRaniHaiJeevanUskaPaaniHai"
 
 // FileUploader upload a file directly
-func FileUploader(f *os.File, proxyWriter func(io.Writer) io.Writer, encryption, encryptionKey string, done chan int8) (r *io.PipeReader, contentType string, size int64) {
-	// Retrieve file stats
+func FileUploader(f *os.File, proxyWriter func(io.Writer) io.Writer, encryption, encryptionKey string, done chan string) (r *io.PipeReader, contentType string, size int64) {
 	fi, err := f.Stat()
 	if err != nil {
 		log.Fatal(err)
@@ -350,56 +349,74 @@ func FileUploader(f *os.File, proxyWriter func(io.Writer) io.Writer, encryption,
 		return nil, "", -1
 	}
 
-	// 16 additional checksum bytes
-	size += 16
+	// Add boundary len cause this will be
+	// written as well
+	size += int64(len(Boundary))
 
-	r, w := io.Pipe()
-	mpw := multipart.NewWriter(w)
-	mpw.SetBoundary(Boundary)
-	contentType = mpw.FormDataContentType()
+	r, pW := io.Pipe()
+
+	// Create multipart
+	multipartW := multipart.NewWriter(pW)
+	multipartW.SetBoundary(Boundary)
+	contentType = multipartW.FormDataContentType()
 
 	go func() {
-		part, err := mpw.CreateFormFile("file", fi.Name())
+		partW, err := multipartW.CreateFormFile("fakefield", f.Name())
 		if err != nil {
-			log.Fatal(err)
+			pW.CloseWithError(err)
+			done <- ""
+			return
 		}
 
-		hasher := md5.New()
-
-		// Allow overwriting the part writer for eg. A progressbar
-		part = proxyWriter(part)
-		part = io.MultiWriter(part, hasher)
+		// Create hashobject and use a multiwriter to
+		// write to the part and the hash at thes
+		hash := crc32.NewIEEE()
+		writer := io.MultiWriter(proxyWriter(partW), hash)
 
 		buf := make([]byte, 10*1024)
 
 		switch encryption {
 		case EncryptionCiphers[0]:
 			{
-				err = Encrypt(f, part, []byte(encryptionKey), buf)
+				err = Encrypt(f, writer, []byte(encryptionKey), buf)
 			}
 		case "":
 			{
-				_, err = io.CopyBuffer(part, f, buf)
+				err = upload(f, writer, buf)
 			}
 		}
 
-		if err != nil && err != io.EOF {
-			log.Panicln(err)
-		}
-
-		// Append md5
-		sum := hasher.Sum(nil)
-		_, err = io.Copy(part, bytes.NewBuffer(sum))
-
-		if err != nil && err != io.EOF {
-			log.Panicln(err)
-		}
-
-		w.Close()
 		f.Close()
-		mpw.Close()
-		done <- 1
+		multipartW.Close()
+
+		if err != nil {
+			pW.CloseWithError(err)
+			done <- ""
+		} else {
+			pW.Close()
+			done <- hex.EncodeToString(hash.Sum(nil))
+		}
 	}()
 
 	return
+}
+
+func upload(f io.Reader, writer io.Writer, buf []byte) error {
+	for {
+		n, err := f.Read(buf)
+		if n > 0 {
+			_, err := writer.Write(buf[:n])
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

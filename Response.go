@@ -67,6 +67,7 @@ type UploadResponse struct {
 	FileID         uint   `json:"fileID"`
 	Filename       string `json:"filename"`
 	PublicFilename string `json:"publicFilename,omitempty"`
+	Checksum       string `json:"checksum"`
 }
 
 // PublishResponse response for publishing a file

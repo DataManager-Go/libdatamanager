@@ -12,6 +12,7 @@ const (
 	// KeystoreDBFile the sqlite DB containing the file-key associations
 	KeystoreDBFile = ".keys.db"
 
+	// KeyringService the servicename for the keyring
 	KeyringService = "DataManagerCLI-keystore"
 )
 
@@ -40,7 +41,7 @@ func NewKeystore(path string) *Keystore {
 	}
 }
 
-// GetKeyFilepath returns the full path of file
+// GetKeystoreFile returns the full path of file
 func (store *Keystore) GetKeystoreFile(file string) string {
 	return filepath.Join(store.Path, file)
 }
@@ -96,6 +97,8 @@ func (store *Keystore) GetKeyFile(fileID uint) (*KeystoreFile, error) {
 	return &storeFile, nil
 }
 
+// GetKey returns the key assigned to the fileID. If FileID or key was
+// not found, error is not nil
 func (store *Keystore) GetKey(fileID uint) ([]byte, error) {
 	// Get DB filekey
 	storefile, err := store.GetKeyFile(fileID)
