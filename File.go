@@ -268,7 +268,7 @@ var NoProxyWriter = func(w io.Writer) io.Writer {
 // [0] public name
 // [1] encryption
 // [2] encryptionKey
-func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, attributes FileAttributes, proxyWriter func(w io.Writer) io.Writer, fsDetermined chan int64, done chan string, strArgs ...string) (*UploadResponse, error) {
+func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, attributes FileAttributes, proxyWriter func(w io.Writer) io.Writer, fsDetermined chan int64, strArgs ...string) (*UploadResponse, string, error) {
 	if replaceFile < 0 {
 		replaceFile = 0
 	}
@@ -296,6 +296,7 @@ func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, 
 
 	var contentType string
 	var body io.Reader
+	c := make(chan string, 1)
 
 	// Check for url/file
 	u, err := url.Parse(path)
@@ -312,12 +313,12 @@ func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, 
 			if fsDetermined != nil {
 				fsDetermined <- 0
 			}
-			return nil, &ResponseErr{Err: err}
+			return nil, "", &ResponseErr{Err: err}
 		}
 
 		// Init upload stuff
 		request.UploadType = FileUploadType
-		body, contentType, request.Size = FileUploader(f, proxyWriter, encryption, encryptionKey, done)
+		body, contentType, request.Size = FileUploader(f, proxyWriter, encryption, encryptionKey, c)
 	}
 
 	if fsDetermined != nil {
@@ -327,7 +328,7 @@ func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, 
 	// Make json header content
 	rbody, err := json.Marshal(request)
 	if err != nil {
-		return nil, &ResponseErr{
+		return nil, "", &ResponseErr{
 			Err: err,
 		}
 	}
@@ -344,10 +345,10 @@ func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, 
 		Do(&resStruct)
 
 	if err != nil || response.Status == ResponseError {
-		return nil, NewErrorFromResponse(response, err)
+		return nil, "", NewErrorFromResponse(response, err)
 	}
 
-	return &resStruct, nil
+	return &resStruct, <-c, nil
 }
 
 // Boundary boundary for the part
