@@ -160,8 +160,8 @@ type NamespaceRequest struct {
 	Type      NamespaceType `json:"nstype"`
 }
 
-// UploadRequest contains file info (and a file)
-type UploadRequest struct {
+// UploadRequestStruct contains file info (and a file)
+type UploadRequestStruct struct {
 	UploadType  UploadType     `json:"type"`
 	URL         string         `json:"url,omitempty"`
 	Name        string         `json:"name"`

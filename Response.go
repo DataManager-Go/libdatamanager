@@ -78,6 +78,8 @@ type UploadResponse struct {
 	Filename       string `json:"filename"`
 	PublicFilename string `json:"publicFilename,omitempty"`
 	Checksum       string `json:"checksum"`
+	FileSize       int64  `json:"size"`
+	Namespace      string `json:"ns"`
 }
 
 // PublishResponse response for publishing a file

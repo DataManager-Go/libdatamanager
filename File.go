@@ -1,16 +1,10 @@
 package libdatamanager
 
 import (
-	"crypto/aes"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"hash/crc32"
 	"io"
-	"log"
-	"mime/multipart"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -258,171 +252,6 @@ func (libdm LibDM) UpdateFile(name string, id uint, namespace string, all bool, 
 	return &response, nil
 }
 
-// NoProxyWriter use to fill proxyWriter arg in UpdloadFile
-var NoProxyWriter = func(w io.Writer) io.Writer {
-	return w
-}
-
-// UploadFile uploads the given file to the server and set's its affiliations
-// strargs:
-// [0] public name
-// [1] encryption
-// [2] encryptionKey
-func (libdm LibDM) UploadFile(path, name string, public bool, replaceFile uint, attributes FileAttributes, proxyWriter func(w io.Writer) io.Writer, fsDetermined chan int64, strArgs ...string) (*UploadResponse, string, error) {
-	if replaceFile < 0 {
-		replaceFile = 0
-	}
-
-	var encryption, encryptionKey, publicName string
-	if len(strArgs) > 0 {
-		publicName = strArgs[0]
-	}
-	if len(strArgs) > 1 {
-		encryption = strArgs[1]
-	}
-	if len(strArgs) > 2 {
-		encryptionKey = strArgs[2]
-	}
-
-	// Bulid request
-	request := UploadRequest{
-		Name:        name,
-		Attributes:  attributes,
-		Public:      public,
-		PublicName:  publicName,
-		Encryption:  encryption,
-		ReplaceFile: replaceFile,
-	}
-
-	var contentType string
-	var body io.Reader
-	c := make(chan string, 1)
-
-	// Check for url/file
-	u, err := url.Parse(path)
-	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
-		request.UploadType = URLUploadType
-		request.URL = path
-
-		contentType = string(JSONContentType)
-	} else {
-		// Open file
-		f, err := os.Open(path)
-		if err != nil {
-			// Write 0 into channel to prevent deatlocks
-			if fsDetermined != nil {
-				fsDetermined <- 0
-			}
-			return nil, "", &ResponseErr{Err: err}
-		}
-
-		// Init upload stuff
-		request.UploadType = FileUploadType
-		body, contentType, request.Size = FileUploader(f, proxyWriter, encryption, encryptionKey, c)
-	}
-
-	if fsDetermined != nil {
-		fsDetermined <- request.Size
-	}
-
-	// Make json header content
-	rbody, err := json.Marshal(request)
-	if err != nil {
-		return nil, "", &ResponseErr{
-			Err: err,
-		}
-	}
-
-	rBase := base64.StdEncoding.EncodeToString(rbody)
-
-	// Do request
-	var resStruct UploadResponse
-	response, err := NewRequest(EPFileUpload, body, libdm.Config).
-		WithMethod(PUT).
-		WithAuth(libdm.Config.GetBearerAuth()).WithHeader(HeaderRequest, rBase).
-		WithRequestType(RawRequestType).
-		WithContentType(ContentType(contentType)).
-		Do(&resStruct)
-
-	if err != nil || response.Status == ResponseError {
-		return nil, "", NewErrorFromResponse(response, err)
-	}
-
-	return &resStruct, <-c, nil
-}
-
-// Boundary boundary for the part
-var Boundary = "MachliJalKiRaniHaiJeevanUskaPaaniHai"
-
-// FileUploader upload a file directly
-func FileUploader(f *os.File, proxyWriter func(io.Writer) io.Writer, encryption, encryptionKey string, done chan string) (r *io.PipeReader, contentType string, size int64) {
-	fi, err := f.Stat()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Set filesize
-	switch encryption {
-	case EncryptionCiphers[0]:
-		size = fi.Size() + aes.BlockSize
-	case "":
-		size = fi.Size()
-	default:
-		return nil, "", -1
-	}
-
-	// Add boundary len cause this will be
-	// written as well
-	size += int64(len(Boundary))
-
-	r, pW := io.Pipe()
-
-	// Create multipart
-	multipartW := multipart.NewWriter(pW)
-	multipartW.SetBoundary(Boundary)
-	contentType = multipartW.FormDataContentType()
-
-	go func() {
-		partW, err := multipartW.CreateFormFile("fakefield", f.Name())
-		if err != nil {
-			pW.CloseWithError(err)
-			done <- ""
-			return
-		}
-
-		// Create hashobject and use a multiwriter to
-		// write to the part and the hash at thes
-		hash := crc32.NewIEEE()
-		writer := io.MultiWriter(proxyWriter(partW), hash)
-
-		buf := make([]byte, 10*1024)
-
-		switch encryption {
-		case EncryptionCiphers[0]:
-			{
-				err = Encrypt(f, writer, []byte(encryptionKey), buf)
-			}
-		case "":
-			{
-				err = upload(f, writer, buf)
-			}
-		}
-
-		f.Close()
-		multipartW.Close()
-
-		if err != nil {
-			pW.CloseWithError(err)
-			done <- ""
-		} else {
-			pW.Close()
-			done <- hex.EncodeToString(hash.Sum(nil))
-		}
-	}()
-
-	return
-}
-
 // GetFilesizeFromDownloadRequest returns the filesize from a
 // file from the response headers
 func GetFilesizeFromDownloadRequest(resp *http.Response) int64 {
@@ -439,24 +268,4 @@ func GetFilesizeFromDownloadRequest(resp *http.Response) int64 {
 	}
 
 	return 0
-}
-
-func upload(f io.Reader, writer io.Writer, buf []byte) error {
-	for {
-		n, err := f.Read(buf)
-		if n > 0 {
-			_, err := writer.Write(buf[:n])
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
