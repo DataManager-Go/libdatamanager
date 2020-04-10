@@ -422,6 +422,24 @@ func FileUploader(f *os.File, proxyWriter func(io.Writer) io.Writer, encryption,
 	return
 }
 
+// GetFilesizeFromDownloadRequest returns the filesize from a
+// file from the response headers
+func GetFilesizeFromDownloadRequest(resp *http.Response) int64 {
+	// Get the header
+	sizeHeader := resp.Header.Get(HeaderContentLength)
+
+	// Validate it
+	if len(sizeHeader) > 0 {
+		// Parse it
+		s, err := strconv.ParseInt(sizeHeader, 10, 64)
+		if err == nil {
+			return s
+		}
+	}
+
+	return 0
+}
+
 func upload(f io.Reader, writer io.Writer, buf []byte) error {
 	for {
 		n, err := f.Read(buf)

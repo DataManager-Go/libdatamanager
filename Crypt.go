@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"errors"
 	"io"
 	"os"
 	"strings"
@@ -97,6 +98,48 @@ func Encrypt(in io.Reader, out io.Writer, keyAes, buff []byte) (err error) {
 			outBuf := make([]byte, n)
 			ctr.XORKeyStream(outBuf, buff[:n])
 			out.Write(outBuf)
+		}
+
+		if err == io.EOF {
+			break
+		}
+	}
+
+	return nil
+}
+
+// Decrypt decrypt stuff
+func Decrypt(in io.Reader, out, hashwriter io.Writer, keyAes, buff []byte) (err error) {
+	iv := make([]byte, 16)
+
+	aes, err := aes.NewCipher(keyAes)
+	if err != nil {
+		return err
+	}
+
+	n, err := in.Read(iv)
+	if err != nil {
+		return err
+	}
+
+	if n != 16 {
+		return errors.New("reading aes iv")
+	}
+
+	hashwriter.Write(iv)
+	ctr := cipher.NewCTR(aes, iv)
+
+	for {
+		n, err := in.Read(buff)
+		if err != nil && err != io.EOF {
+			return err
+		}
+
+		if n != 0 {
+			outBuf := make([]byte, n)
+			ctr.XORKeyStream(outBuf, buff[:n])
+			out.Write(outBuf)
+			hashwriter.Write(buff[:n])
 		}
 
 		if err == io.EOF {
