@@ -155,7 +155,7 @@ func (uploadRequest UploadRequest) Do(body io.Reader, payload interface{}, conte
 
 	// Do request
 	var resStruct UploadResponse
-	response, err := NewRequest(EPFileUpload, body, uploadRequest.Config).
+	response, err := uploadRequest.NewRequest(EPFileUpload, body).
 		WithMethod(PUT).
 		WithAuth(uploadRequest.Config.GetBearerAuth()).WithHeader(HeaderRequest, base64.StdEncoding.EncodeToString(rbody)).
 		WithRequestType(RawRequestType).

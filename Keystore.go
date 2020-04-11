@@ -17,11 +17,16 @@ const (
 	KeyringService = "DataManagerCLI-keystore"
 )
 
+// Errors
 var (
 	// ErrKeyUnavailable if keystore key is unavailable
 	ErrKeyUnavailable = errors.New("keyring key is unavailable")
+
 	// ErrKeystoreNoDir error if keystore is no directory
 	ErrKeystoreNoDir = errors.New("Keystore is not a directory")
+
+	// ErrKeyAlreadyexists error if keystore already contains an entry for the given fileid
+	ErrKeyAlreadyexists = errors.New("Keystore already contains given key")
 )
 
 // KeystoreFile the keystore row
@@ -65,11 +70,13 @@ func (store *Keystore) Open() error {
 		return err
 	}
 
+	// return error if given keystore
+	// path is not a dir
 	if !store.fileInfo.IsDir() {
 		return ErrKeystoreNoDir
 	}
 
-	// Open DB into memory
+	// Open DB
 	store.DB, err = gorm.Open("sqlite3", store.GetKeystoreDataFile())
 	if err != nil {
 		return err
@@ -81,8 +88,31 @@ func (store *Keystore) Open() error {
 	return err
 }
 
+// HasKey check if keystore already contains given fileID
+func (store *Keystore) HasKey(fileID uint) (bool, error) {
+	var c int
+
+	err := store.DB.Model(&KeystoreFile{}).Where(&KeystoreFile{
+		FileID: fileID,
+	}).Limit(1).Count(&c).Error
+
+	return c > 0, err
+}
+
 // AddKey Inserts key into keystore
 func (store *Keystore) AddKey(fileID uint, keyPath string) error {
+	// Check if key already exists
+	if has, err := store.HasKey(fileID); err != nil || has {
+		if err != nil {
+			return err
+		}
+
+		if has {
+			return ErrKeyAlreadyexists
+		}
+	}
+
+	// Create and insert key
 	_, keyFile := filepath.Split(keyPath)
 	return store.DB.Create(&KeystoreFile{
 		FileID: fileID,
@@ -104,7 +134,11 @@ func (store *Keystore) GetKeyFile(fileID uint) (*KeystoreFile, error) {
 	var storeFile KeystoreFile
 
 	// Find in db
-	err := store.DB.Model(&KeystoreFile{}).Where("file_id=?", fileID).Find(&storeFile).Error
+	err := store.DB.Model(&KeystoreFile{}).
+		Where("file_id=?", fileID).
+		Limit(1).
+		Find(&storeFile).Error
+
 	if err != nil {
 		return nil, err
 	}
@@ -138,14 +172,19 @@ func (store *Keystore) GetFiles() ([]KeystoreFile, error) {
 	return fileitems, nil
 }
 
-// GetValidKeyCount reutrns count of valid keys
-func (store *Keystore) GetValidKeyCount() (int, error) {
+// GetKeyCount reutrns count of keys
+func (store *Keystore) GetKeyCount(validKeysOnly ...bool) (int, error) {
 	var validItems int
 
 	// Get files
 	fileitems, err := store.GetFiles()
 	if err != nil {
 		return 0, err
+	}
+
+	// If all keys are requested, use len(fileItems)
+	if len(validKeysOnly) > 0 && !validKeysOnly[0] {
+		return len(fileitems), nil
 	}
 
 	// Select valid files
@@ -165,9 +204,10 @@ func (store *Keystore) GetFileInfo() *os.FileInfo {
 }
 
 // Close closes the keystore
-func (store *Keystore) Close() {
+func (store *Keystore) Close() error {
 	if store == nil || store.DB == nil {
-		return
+		return nil
 	}
-	store.DB.Close()
+
+	return store.DB.Close()
 }

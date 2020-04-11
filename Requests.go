@@ -192,12 +192,12 @@ const (
 )
 
 // NewRequest creates a new post request
-func NewRequest(endpoint Endpoint, payload interface{}, config *RequestConfig) *Request {
+func (limdm *LibDM) NewRequest(endpoint Endpoint, payload interface{}) *Request {
 	return &Request{
 		RequestType: JSONRequestType,
 		Endpoint:    endpoint,
 		Payload:     payload,
-		Config:      config,
+		Config:      limdm.Config,
 		Method:      POST,
 		ContentType: JSONContentType,
 	}

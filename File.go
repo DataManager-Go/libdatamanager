@@ -90,13 +90,13 @@ func (libdm LibDM) ListFiles(name string, id uint, allNamespaces bool, attribute
 
 // PublishFile publishs a file. If "all" is true, the response object is BulkPublishResponse. Else it is PublishResponse
 func (libdm LibDM) PublishFile(name string, id uint, publicName string, all bool, attributes FileAttributes) (interface{}, error) {
-	request := *NewRequest(EPFilePublish, FileRequest{
+	request := libdm.NewRequest(EPFilePublish, FileRequest{
 		Name:       name,
 		FileID:     id,
 		PublicName: publicName,
 		All:        all,
 		Attributes: attributes,
-	}, libdm.Config).WithAuthFromConfig()
+	}).WithAuthFromConfig()
 
 	var err error
 	var response *RestRequestResponse
@@ -123,13 +123,13 @@ func (libdm LibDM) PublishFile(name string, id uint, publicName string, all bool
 // -> response, serverfilename, checksum, error
 // The response body must be closed
 func (libdm LibDM) GetFile(name string, id uint, namespace string) (*http.Response, string, string, error) {
-	resp, err := NewRequest(EPFileGet, &FileRequest{
+	resp, err := libdm.NewRequest(EPFileGet, &FileRequest{
 		Name:   name,
 		FileID: id,
 		Attributes: FileAttributes{
 			Namespace: namespace,
 		},
-	}, libdm.Config).WithAuthFromConfig().DoHTTPRequest()
+	}).WithAuthFromConfig().DoHTTPRequest()
 
 	// Check for error
 	if err != nil {
