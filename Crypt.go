@@ -72,9 +72,11 @@ func IsValidCipher(c string) bool {
 	return false
 }
 
-// Encrypt encrypts input stream and writes it to out
-func Encrypt(in io.Reader, out io.Writer, keyAes, buff []byte) (err error) {
+// EncryptAES encrypts input stream and writes it to out
+func EncryptAES(in io.Reader, out io.Writer, keyAes, buff []byte) (err error) {
 	iv := make([]byte, 16)
+
+	// Create random iv
 	_, err = rand.Read(iv)
 	if err != nil {
 		return err
@@ -86,8 +88,12 @@ func Encrypt(in io.Reader, out io.Writer, keyAes, buff []byte) (err error) {
 	}
 
 	ctr := cipher.NewCTR(aes, iv)
+
+	// First 16 bytes of ciphertext will
+	// be the iv, so write it!
 	out.Write(iv)
 
+	// Encrypt file
 	for {
 		n, err := in.Read(buff)
 		if err != nil && err != io.EOF {
@@ -108,8 +114,9 @@ func Encrypt(in io.Reader, out io.Writer, keyAes, buff []byte) (err error) {
 	return nil
 }
 
-// Decrypt decrypt stuff
-func Decrypt(in io.Reader, out, hashwriter io.Writer, keyAes, buff []byte) (err error) {
+// DecryptAES decrypt stuff
+func DecryptAES(in io.Reader, out, hashwriter io.Writer, keyAes, buff []byte, cancenChan chan bool) (err error) {
+	// Iv is always 16 bytes
 	iv := make([]byte, 16)
 
 	aes, err := aes.NewCipher(keyAes)
@@ -117,18 +124,28 @@ func Decrypt(in io.Reader, out, hashwriter io.Writer, keyAes, buff []byte) (err 
 		return err
 	}
 
+	// Read first 16 bytes to iv
 	n, err := in.Read(iv)
 	if err != nil {
 		return err
 	}
 
+	// If not 16 bytes were written, there
+	// is a big problem
 	if n != 16 {
 		return errors.New("reading aes iv")
 	}
 
+	// Write iv to hasher cause the servers
+	// hash is built on it too
 	hashwriter.Write(iv)
 	ctr := cipher.NewCTR(aes, iv)
 
+	// Decrypt using xor keystream the
+	// cipher input text is written to the
+	// hashwriter since the servers has no
+	// key and built it's hash using the
+	// encrypted text
 	for {
 		n, err := in.Read(buff)
 		if err != nil && err != io.EOF {
@@ -138,10 +155,13 @@ func Decrypt(in io.Reader, out, hashwriter io.Writer, keyAes, buff []byte) (err 
 		if n != 0 {
 			outBuf := make([]byte, n)
 			ctr.XORKeyStream(outBuf, buff[:n])
+
 			out.Write(outBuf)
 			hashwriter.Write(buff[:n])
 		}
 
+		// Treat eof as stop condition, not as
+		// an error
 		if err == io.EOF {
 			break
 		}

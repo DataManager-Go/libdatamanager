@@ -14,7 +14,7 @@ import (
 )
 
 // NoProxyWriter use to fill proxyWriter arg in UpdloadFile
-var NoProxyWriter = func(w io.Writer) io.Writer {
+var NoProxyWriter WriterProxy = func(w io.Writer) io.Writer {
 	return w
 }
 
@@ -31,13 +31,16 @@ const (
 // UploadRequest a uploadrequest
 type UploadRequest struct {
 	LibDM
-	Name          string
-	Publicname    string
-	Public        bool
-	Attribute     FileAttributes
-	ReplaceFileID uint
-	Encryption    string
-	EncryptionKey []byte
+	Name             string
+	Publicname       string
+	Public           bool
+	Attribute        FileAttributes
+	ReplaceFileID    uint
+	Encryption       string
+	EncryptionKey    []byte
+	Buffersize       int
+	fileSizeCallback FileSizeCallback
+	ProxyWriter      WriterProxy
 }
 
 // NewUploadRequest create a new uploadrequest
@@ -51,6 +54,30 @@ func (libdm LibDM) NewUploadRequest(name string, attributes FileAttributes) *Upl
 		Name:      name,
 		Attribute: attributes,
 	}
+}
+
+// SetFileSizeCallback sets the callback if the filesize is known
+func (uploadRequest *UploadRequest) SetFileSizeCallback(cb FileSizeCallback) *UploadRequest {
+	uploadRequest.fileSizeCallback = cb
+	return uploadRequest
+}
+
+// GetProxy returns proxywriter for uploadRequest
+func (uploadRequest *UploadRequest) GetProxy() WriterProxy {
+	if uploadRequest.ProxyWriter == nil {
+		return NoProxyWriter
+	}
+
+	return uploadRequest.ProxyWriter
+}
+
+// GetBuffersize returns the buffersize
+func (uploadRequest *UploadRequest) GetBuffersize() int {
+	if uploadRequest.Buffersize <= 0 {
+		return DefaultBuffersize
+	}
+
+	return uploadRequest.Buffersize
 }
 
 // MakePublic upload and publish a file. If publciName is empty a
@@ -107,18 +134,15 @@ func (uploadRequest UploadRequest) UploadURL(u *url.URL) (*UploadResponse, error
 }
 
 // UploadFromReader upload a file using r as data source
-func (uploadRequest UploadRequest) UploadFromReader(r io.Reader, size int64, fsDetermined chan int64, proxyWriter func(w io.Writer) io.Writer, uploadDone chan string) (*UploadResponse, error) {
-	if proxyWriter == nil {
-		proxyWriter = NoProxyWriter
-	}
-
+func (uploadRequest *UploadRequest) UploadFromReader(r io.Reader, size int64, uploadDone chan string) (*UploadResponse, error) {
 	// Build request and body
 	request := uploadRequest.BuildRequestStruct(FileUploadType)
-	body, contenttype, size := uploadBodyBuilder(r, size, proxyWriter, uploadRequest.Encryption, uploadRequest.EncryptionKey, uploadDone)
+	body, contenttype, size := uploadRequest.uploadBodyBuilder(r, size, uploadDone)
 	request.Size = size
 
-	if fsDetermined != nil {
-		fsDetermined <- size
+	// Run filesize callback if set
+	if uploadRequest.fileSizeCallback != nil {
+		uploadRequest.fileSizeCallback(size)
 	}
 
 	resp, err := uploadRequest.Do(body, request, ContentType(contenttype))
@@ -130,7 +154,7 @@ func (uploadRequest UploadRequest) UploadFromReader(r io.Reader, size int64, fsD
 }
 
 // UploadFile uploads the given file to the server
-func (uploadRequest UploadRequest) UploadFile(f *os.File, fsDetermined chan int64, proxyWriter func(w io.Writer) io.Writer, uploadDone chan string) (*UploadResponse, error) {
+func (uploadRequest *UploadRequest) UploadFile(f *os.File, uploadDone chan string) (*UploadResponse, error) {
 	// Check if file exists and use
 	// its size to provide a relyable
 	// upload filesize
@@ -140,11 +164,11 @@ func (uploadRequest UploadRequest) UploadFile(f *os.File, fsDetermined chan int6
 	}
 
 	// Upload from file using it's io.Reader
-	return uploadRequest.UploadFromReader(f, fi.Size(), fsDetermined, proxyWriter, uploadDone)
+	return uploadRequest.UploadFromReader(f, fi.Size(), uploadDone)
 }
 
 // Do does the final upload http request and uploads the src
-func (uploadRequest UploadRequest) Do(body io.Reader, payload interface{}, contentType ContentType) (*UploadResponse, error) {
+func (uploadRequest *UploadRequest) Do(body io.Reader, payload interface{}, contentType ContentType) (*UploadResponse, error) {
 	// Make json header content
 	rbody, err := json.Marshal(payload)
 	if err != nil {
@@ -170,12 +194,12 @@ func (uploadRequest UploadRequest) Do(body io.Reader, payload interface{}, conte
 }
 
 // uploadBodyBuilder upload a file directly
-func uploadBodyBuilder(reader io.Reader, inpSize int64, proxyWriter func(io.Writer) io.Writer, encryption string, encryptionKey []byte, doneChan chan string) (r *io.PipeReader, contentType string, size int64) {
+func (uploadRequest *UploadRequest) uploadBodyBuilder(reader io.Reader, inpSize int64, doneChan chan string) (r *io.PipeReader, contentType string, size int64) {
 	// Don't calculate a size if inputsize
 	// is empty to prevent returning an inalid size
 	if inpSize > 0 {
 		// Set filesize
-		switch encryption {
+		switch uploadRequest.Encryption {
 		case EncryptionCiphers[0]:
 			size = inpSize + aes.BlockSize
 		case "":
@@ -207,15 +231,15 @@ func uploadBodyBuilder(reader io.Reader, inpSize int64, proxyWriter func(io.Writ
 		// Create hashobject and use a multiwriter to
 		// write to the part and the hash at thes
 		hash := crc32.NewIEEE()
-		writer := io.MultiWriter(proxyWriter(partW), hash)
+		writer := io.MultiWriter((uploadRequest.GetProxy()(partW)), hash)
 
-		buf := make([]byte, 10*1024)
+		buf := make([]byte, uploadRequest.GetBuffersize())
 
 		// Copy from input reader to writer using
 		// to support encryption
-		switch encryption {
+		switch uploadRequest.Encryption {
 		case EncryptionCiphers[0]:
-			err = Encrypt(reader, writer, encryptionKey, buf)
+			err = EncryptAES(reader, writer, uploadRequest.EncryptionKey, buf)
 		case "":
 			_, err = io.CopyBuffer(writer, reader, buf)
 		}
