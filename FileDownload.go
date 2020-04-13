@@ -174,7 +174,7 @@ func (fileRequest *FileDownloadRequest) Do() (*FileDownloadResponse, error) {
 }
 
 // WriteToFile saves a file to the given localFilePath containing the body of the given response
-func (fileresponse *FileDownloadResponse) WriteToFile(localFilePath string, fmode os.FileMode) error {
+func (fileresponse *FileDownloadResponse) WriteToFile(localFilePath string, fmode os.FileMode, cancelChan chan bool) error {
 	// Create loal file
 	f, err := os.OpenFile(localFilePath, os.O_CREATE|os.O_TRUNC|os.O_RDWR, fmode)
 	defer f.Close()
@@ -183,7 +183,7 @@ func (fileresponse *FileDownloadResponse) WriteToFile(localFilePath string, fmod
 	}
 
 	// Save body to file using given proxy
-	err = fileresponse.SaveTo(fileresponse.DownloadRequest.GetProxy()(f))
+	err = fileresponse.SaveTo(fileresponse.DownloadRequest.GetProxy()(f), cancelChan)
 	if err != nil {
 		return err
 	}
@@ -218,7 +218,7 @@ func (fileRequest *FileDownloadRequest) DownloadToFile(localFilePath string, fmo
 	}
 
 	// Write to file
-	err = resp.SaveTo((fileRequest.GetProxy()(f)))
+	err = resp.SaveTo((fileRequest.GetProxy()(f)), fileRequest.CancelDownload)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (fileresponse *FileDownloadResponse) VerifyChecksum() bool {
 }
 
 // SaveTo download a file and write it to the writer while
-func (fileresponse *FileDownloadResponse) SaveTo(w io.Writer) error {
+func (fileresponse *FileDownloadResponse) SaveTo(w io.Writer, cancelChan chan bool) error {
 	defer fileresponse.Response.Body.Close()
 
 	var err error
@@ -273,7 +273,7 @@ func (fileresponse *FileDownloadResponse) SaveTo(w io.Writer) error {
 	} else {
 		// Use multiwriter to write to hash and file
 		// at the same time
-		_, err = io.CopyBuffer(io.MultiWriter(w, hash), fileresponse.Response.Body, buff)
+		err = cancelledCopy(io.MultiWriter(w, hash), fileresponse.Response.Body, buff, cancelChan)
 	}
 
 	if err != nil {
@@ -282,5 +282,32 @@ func (fileresponse *FileDownloadResponse) SaveTo(w io.Writer) error {
 
 	// Set local calculated checksum
 	fileresponse.LocalChecksum = hex.EncodeToString(hash.Sum(nil))
+	return nil
+}
+
+func cancelledCopy(writer io.Writer, f io.Reader, buf []byte, cancelChan chan bool) error {
+	for {
+		// Exit on cancel
+		select {
+		case _ = <-cancelChan:
+			return ErrCancelled
+		default:
+		}
+
+		n, err := f.Read(buf)
+		if n > 0 {
+			_, err := writer.Write(buf[:n])
+			if err != nil {
+				return err
+			}
+		}
+
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

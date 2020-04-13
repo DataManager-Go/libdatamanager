@@ -134,10 +134,10 @@ func (uploadRequest UploadRequest) UploadURL(u *url.URL) (*UploadResponse, error
 }
 
 // UploadFromReader upload a file using r as data source
-func (uploadRequest *UploadRequest) UploadFromReader(r io.Reader, size int64, uploadDone chan string) (*UploadResponse, error) {
+func (uploadRequest *UploadRequest) UploadFromReader(r io.Reader, size int64, uploadDone chan string, cancel chan bool) (*UploadResponse, error) {
 	// Build request and body
 	request := uploadRequest.BuildRequestStruct(FileUploadType)
-	body, contenttype, size := uploadRequest.uploadBodyBuilder(r, size, uploadDone)
+	body, contenttype, size := uploadRequest.uploadBodyBuilder(r, size, uploadDone, cancel)
 	request.Size = size
 
 	// Run filesize callback if set
@@ -154,7 +154,7 @@ func (uploadRequest *UploadRequest) UploadFromReader(r io.Reader, size int64, up
 }
 
 // UploadFile uploads the given file to the server
-func (uploadRequest *UploadRequest) UploadFile(f *os.File, uploadDone chan string) (*UploadResponse, error) {
+func (uploadRequest *UploadRequest) UploadFile(f *os.File, uploadDone chan string, cancel chan bool) (*UploadResponse, error) {
 	// Check if file exists and use
 	// its size to provide a relyable
 	// upload filesize
@@ -164,7 +164,7 @@ func (uploadRequest *UploadRequest) UploadFile(f *os.File, uploadDone chan strin
 	}
 
 	// Upload from file using it's io.Reader
-	return uploadRequest.UploadFromReader(f, fi.Size(), uploadDone)
+	return uploadRequest.UploadFromReader(f, fi.Size(), uploadDone, cancel)
 }
 
 // Do does the final upload http request and uploads the src
@@ -194,7 +194,7 @@ func (uploadRequest *UploadRequest) Do(body io.Reader, payload interface{}, cont
 }
 
 // uploadBodyBuilder upload a file directly
-func (uploadRequest *UploadRequest) uploadBodyBuilder(reader io.Reader, inpSize int64, doneChan chan string) (r *io.PipeReader, contentType string, size int64) {
+func (uploadRequest *UploadRequest) uploadBodyBuilder(reader io.Reader, inpSize int64, doneChan chan string, cancel chan bool) (r *io.PipeReader, contentType string, size int64) {
 	// Don't calculate a size if inputsize
 	// is empty to prevent returning an inalid size
 	if inpSize > 0 {
@@ -239,7 +239,7 @@ func (uploadRequest *UploadRequest) uploadBodyBuilder(reader io.Reader, inpSize 
 		// to support encryption
 		switch uploadRequest.Encryption {
 		case EncryptionCiphers[0]:
-			err = EncryptAES(reader, writer, uploadRequest.EncryptionKey, buf)
+			err = EncryptAES(reader, writer, uploadRequest.EncryptionKey, buf, cancel)
 		case "":
 			_, err = io.CopyBuffer(writer, reader, buf)
 		}

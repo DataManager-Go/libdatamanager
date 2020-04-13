@@ -10,21 +10,6 @@ import (
 	"strings"
 )
 
-// Return byte slice with base64 encoded file content
-func fileToBase64(filename string, fh *os.File) ([]byte, error) {
-	s, err := os.Stat(filename)
-	if err != nil {
-		return nil, err
-	}
-	src := make([]byte, s.Size())
-	_, err = fh.Read(src)
-	if err != nil {
-		return nil, err
-	}
-
-	return encodeBase64(src), nil
-}
-
 // EncryptionCiphers supported encryption chipers
 var EncryptionCiphers = []string{
 	"aes",
@@ -73,7 +58,7 @@ func IsValidCipher(c string) bool {
 }
 
 // EncryptAES encrypts input stream and writes it to out
-func EncryptAES(in io.Reader, out io.Writer, keyAes, buff []byte) (err error) {
+func EncryptAES(in io.Reader, out io.Writer, keyAes, buff []byte, cancel chan bool) (err error) {
 	iv := make([]byte, 16)
 
 	// Create random iv
@@ -95,6 +80,13 @@ func EncryptAES(in io.Reader, out io.Writer, keyAes, buff []byte) (err error) {
 
 	// Encrypt file
 	for {
+		// Stop on cancel
+		select {
+		case <-cancel:
+			return ErrCancelled
+		default:
+		}
+
 		n, err := in.Read(buff)
 		if err != nil && err != io.EOF {
 			return err
@@ -115,7 +107,7 @@ func EncryptAES(in io.Reader, out io.Writer, keyAes, buff []byte) (err error) {
 }
 
 // DecryptAES decrypt stuff
-func DecryptAES(in io.Reader, out, hashwriter io.Writer, keyAes, buff []byte, cancenChan chan bool) (err error) {
+func DecryptAES(in io.Reader, out, hashwriter io.Writer, keyAes, buff []byte, cancelChan chan bool) (err error) {
 	// Iv is always 16 bytes
 	iv := make([]byte, 16)
 
@@ -147,6 +139,13 @@ func DecryptAES(in io.Reader, out, hashwriter io.Writer, keyAes, buff []byte, ca
 	// key and built it's hash using the
 	// encrypted text
 	for {
+		// return on cancel
+		select {
+		case <-cancelChan:
+			return ErrCancelled
+		default:
+		}
+
 		n, err := in.Read(buff)
 		if err != nil && err != io.EOF {
 			return err
@@ -168,4 +167,19 @@ func DecryptAES(in io.Reader, out, hashwriter io.Writer, keyAes, buff []byte, ca
 	}
 
 	return nil
+}
+
+// Return byte slice with base64 encoded file content
+func fileToBase64(filename string, fh *os.File) ([]byte, error) {
+	s, err := os.Stat(filename)
+	if err != nil {
+		return nil, err
+	}
+	src := make([]byte, s.Size())
+	_, err = fh.Read(src)
+	if err != nil {
+		return nil, err
+	}
+
+	return encodeBase64(src), nil
 }

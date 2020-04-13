@@ -1,6 +1,7 @@
 package libdatamanager
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -46,6 +47,11 @@ type FileChanges struct {
 	RemoveTags, RemoveGroups []string
 	SetPublic, SetPrivate    bool
 }
+
+var (
+	// ErrCancelled if something was cancelled
+	ErrCancelled = errors.New("cancelled")
+)
 
 const (
 	// DefaultBuffersize The default buffersize for filestreams
