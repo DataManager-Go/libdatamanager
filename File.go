@@ -3,8 +3,6 @@ package libdatamanager
 import (
 	"errors"
 	"io"
-	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -124,7 +122,7 @@ func (libdm LibDM) PublishFile(name string, id uint, publicName string, all bool
 	}
 
 	if err != nil || response.Status == ResponseError {
-		return nil, err
+		return nil, NewErrorFromResponse(response, err)
 	}
 
 	return resp, nil
@@ -170,22 +168,4 @@ func (libdm LibDM) UpdateFile(name string, id uint, namespace string, all bool, 
 	}
 
 	return &response, nil
-}
-
-// GetFilesizeFromDownloadRequest returns the filesize from a
-// file from the response headers
-func GetFilesizeFromDownloadRequest(resp *http.Response) int64 {
-	// Get the header
-	sizeHeader := resp.Header.Get(HeaderContentLength)
-
-	// Validate it
-	if len(sizeHeader) > 0 {
-		// Parse it
-		s, err := strconv.ParseInt(sizeHeader, 10, 64)
-		if err == nil {
-			return s
-		}
-	}
-
-	return 0
 }

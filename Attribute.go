@@ -77,6 +77,7 @@ func (libdm LibDM) GetTags(namespace string) ([]Attribute, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return attributes, nil
 }
 
@@ -87,5 +88,6 @@ func (libdm LibDM) GetGroups(namespace string) ([]Attribute, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return attributes, nil
 }
