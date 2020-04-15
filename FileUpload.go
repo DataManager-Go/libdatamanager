@@ -137,7 +137,7 @@ func (uploadRequest UploadRequest) UploadURL(u *url.URL) (*UploadResponse, error
 func (uploadRequest *UploadRequest) UploadFromReader(r io.Reader, size int64, uploadDone chan string, cancel chan bool) (*UploadResponse, error) {
 	// Build request and body
 	request := uploadRequest.BuildRequestStruct(FileUploadType)
-	body, contenttype, size := uploadRequest.uploadBodyBuilder(r, size, uploadDone, cancel)
+	body, contenttype, size := uploadRequest.UploadBodyBuilder(r, size, uploadDone, cancel)
 	request.Size = size
 
 	// Run filesize callback if set
@@ -193,8 +193,8 @@ func (uploadRequest *UploadRequest) Do(body io.Reader, payload interface{}, cont
 	return &resStruct, err
 }
 
-// uploadBodyBuilder upload a file directly
-func (uploadRequest *UploadRequest) uploadBodyBuilder(reader io.Reader, inpSize int64, doneChan chan string, cancel chan bool) (r *io.PipeReader, contentType string, size int64) {
+// UploadBodyBuilder build the body for the upload file request
+func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize int64, doneChan chan string, cancel chan bool) (r *io.PipeReader, contentType string, size int64) {
 	// Don't calculate a size if inputsize
 	// is empty to prevent returning an inalid size
 	if inpSize > 0 {
