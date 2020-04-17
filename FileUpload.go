@@ -241,7 +241,7 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 		case EncryptionCiphers[0]:
 			err = EncryptAES(reader, writer, uploadRequest.EncryptionKey, buf, cancel)
 		case "":
-			_, err = io.CopyBuffer(writer, reader, buf)
+			err = cancelledCopy(writer, reader, buf, cancel)
 		}
 
 		// Close everything and write into doneChan
