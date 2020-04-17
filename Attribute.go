@@ -1,7 +1,5 @@
 package libdatamanager
 
-import "fmt"
-
 // Attribute attribute for file (tag/group)
 type Attribute string
 
@@ -35,7 +33,6 @@ func (libdm LibDM) attributeRequest(attribute Attribute, action uint8, namespace
 		} else {
 			endpoint = EPTags
 		}
-		fmt.Println(endpoint)
 	}
 
 	// Build request
