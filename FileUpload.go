@@ -247,8 +247,13 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 		// Close everything and write into doneChan
 		multipartW.Close()
 		if err != nil {
-			pW.CloseWithError(err)
-			doneChan <- ""
+			if err != ErrCancelled {
+				pW.CloseWithError(err)
+				doneChan <- ""
+			} else {
+				pW.Close()
+				doneChan <- "cancelled"
+			}
 		} else {
 			pW.Close()
 			doneChan <- hex.EncodeToString(hash.Sum(nil))
