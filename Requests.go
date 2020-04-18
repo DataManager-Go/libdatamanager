@@ -155,9 +155,8 @@ type CredentialsRequest struct {
 
 // NamespaceRequest namespace action request
 type NamespaceRequest struct {
-	Namespace string        `json:"ns"`
-	NewName   string        `json:"newName,omitempty"`
-	Type      NamespaceType `json:"nstype"`
+	Namespace string `json:"ns"`
+	NewName   string `json:"newName,omitempty"`
 }
 
 // UploadRequestStruct contains file info (and a file)

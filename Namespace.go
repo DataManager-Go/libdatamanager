@@ -1,28 +1,13 @@
 package libdatamanager
 
-// NamespaceType type of namespace
-type NamespaceType uint8
-
-// Namespace types
-const (
-	UserNamespaceType NamespaceType = iota
-	CustomNamespaceType
-)
-
-func (libdm LibDM) namespaceRequest(action uint8, name, newName string, customNs bool) (*StringResponse, error) {
+func (libdm LibDM) namespaceRequest(action uint8, name, newName string) (*StringResponse, error) {
 	var response StringResponse
 	endpoint := namespaceActionToEndpoint(action)
-
-	nsType := UserNamespaceType
-	if customNs {
-		nsType = CustomNamespaceType
-	}
 
 	// Do http request
 	if _, err := libdm.Request(endpoint, &NamespaceRequest{
 		Namespace: name,
 		NewName:   newName,
-		Type:      nsType,
 	}, &response, true); err != nil {
 		return nil, err
 	}
@@ -31,18 +16,18 @@ func (libdm LibDM) namespaceRequest(action uint8, name, newName string, customNs
 }
 
 // CreateNamespace creates a namespace
-func (libdm LibDM) CreateNamespace(name string, customNS bool) (*StringResponse, error) {
-	return libdm.namespaceRequest(1, name, "", customNS)
+func (libdm LibDM) CreateNamespace(name string) (*StringResponse, error) {
+	return libdm.namespaceRequest(1, name, "")
 }
 
 // UpdateNamespace update a namespace
-func (libdm LibDM) UpdateNamespace(name, newName string, customNS bool) (*StringResponse, error) {
-	return libdm.namespaceRequest(2, name, newName, customNS)
+func (libdm LibDM) UpdateNamespace(name, newName string) (*StringResponse, error) {
+	return libdm.namespaceRequest(2, name, newName)
 }
 
 // DeleteNamespace update a namespace
 func (libdm LibDM) DeleteNamespace(name string) (*StringResponse, error) {
-	return libdm.namespaceRequest(0, name, "", false)
+	return libdm.namespaceRequest(0, name, "")
 }
 
 // GetNamespaces get all namespaces

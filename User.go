@@ -1,5 +1,7 @@
 package libdatamanager
 
+import "strings"
+
 // Login login into the server
 func (libdm LibDM) Login(username, password string) (*LoginResponse, error) {
 	var response LoginResponse
@@ -7,7 +9,7 @@ func (libdm LibDM) Login(username, password string) (*LoginResponse, error) {
 	// Do http request
 	resp, err := libdm.NewRequest(EPLogin, CredentialsRequest{
 		Password:  password,
-		Username:  username,
+		Username:  strings.ToLower(username),
 		MachineID: libdm.Config.MachineID,
 	}).Do(&response)
 
@@ -23,7 +25,7 @@ func (libdm LibDM) Login(username, password string) (*LoginResponse, error) {
 func (libdm LibDM) Register(username, password string) (*RestRequestResponse, error) {
 	// Do http request
 	resp, err := libdm.NewRequest(EPRegister, CredentialsRequest{
-		Username: username,
+		Username: strings.ToLower(username),
 		Password: password,
 	}).Do(nil)
 
