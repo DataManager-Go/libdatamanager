@@ -63,8 +63,9 @@ const (
 	// Upload
 	EPFileUpload Endpoint = "/upload" + EPFile
 
-	// Attributes
-	EPAttribute Endpoint = "/attribute"
+	// Attribute
+	EPAttribute  Endpoint = "/attribute"
+	EPAttributes Endpoint = "/attributes"
 	// Tags
 	EPAttributeTag = EPAttribute + "/tag"
 	EPTagUpdate    = EPAttributeTag + "/update"

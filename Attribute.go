@@ -88,3 +88,15 @@ func (libdm LibDM) GetGroups(namespace string) ([]Attribute, error) {
 
 	return attributes, nil
 }
+
+// GetUserAttributeData get attribute data for an user
+func (libdm LibDM) GetUserAttributeData() (*UserAttributeDataResponse, error) {
+	var response *UserAttributeDataResponse
+
+	_, err := libdm.Request(EPAttributes, nil, &response, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
