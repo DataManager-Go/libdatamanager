@@ -100,3 +100,10 @@ func (libdm LibDM) GetUserAttributeData() (*UserAttributeDataResponse, error) {
 
 	return response, nil
 }
+
+// SortByName sorts NamespaceInfo by name
+type SortByName []Namespaceinfo
+
+func (a SortByName) Len() int           { return len(a) }
+func (a SortByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a SortByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
