@@ -340,6 +340,15 @@ func (config *Config) GetToken() (string, error) {
 	return token, nil
 }
 
+// ClearKeyring removes session from keyring
+func (config *Config) ClearKeyring(username string) error {
+	if len(username) == 0 {
+		username = config.User.Username
+	}
+
+	return keyring.Delete(KeyringServiceName, username)
+}
+
 // IsUnlockError return true if err is unlock error
 func IsUnlockError(err error) bool {
 	if err == nil {
