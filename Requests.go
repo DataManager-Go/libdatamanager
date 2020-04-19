@@ -68,11 +68,13 @@ const (
 	EPAttributes Endpoint = "/attributes"
 	// Tags
 	EPAttributeTag = EPAttribute + "/tag"
+	EPTagCreate    = EPAttributeTag + "/create"
 	EPTagUpdate    = EPAttributeTag + "/update"
 	EPTagDelete    = EPAttributeTag + "/delete"
 	EPTags         = EPAttributeTag + "/get"
 	// Group
 	EPAttributeGroup = EPAttribute + "/group"
+	EPGroupCreate    = EPAttributeGroup + "/create"
 	EPGroupUpdate    = EPAttributeGroup + "/update"
 	EPGroupDelete    = EPAttributeGroup + "/delete"
 	EPGroups         = EPAttributeGroup + "/get"
@@ -158,6 +160,12 @@ type CredentialsRequest struct {
 type NamespaceRequest struct {
 	Namespace string `json:"ns"`
 	NewName   string `json:"newName,omitempty"`
+}
+
+// UserAttributesRequest request for getting
+// namespaces and groups
+type UserAttributesRequest struct {
+	Mode uint `json:"m"`
 }
 
 // UploadRequestStruct contains file info (and a file)

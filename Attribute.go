@@ -9,7 +9,7 @@ const (
 	GroupAttribute Attribute = "group"
 )
 
-// Do an attribute request (update/delete group or tag). action: 0 - delete, 1 - update
+// Do an attribute request (update/delete group or tag). action: 0 - delete, 1 - update, 2 - get, 3 - create
 func (libdm LibDM) attributeRequest(attribute Attribute, action uint8, namespace string, name string, response interface{}, newName ...string) (*RestRequestResponse, error) {
 	var endpoint Endpoint
 
@@ -33,6 +33,12 @@ func (libdm LibDM) attributeRequest(attribute Attribute, action uint8, namespace
 		} else {
 			endpoint = EPTags
 		}
+	case 3:
+		if attribute == GroupAttribute {
+			endpoint = EPGroupCreate
+		} else {
+			endpoint = EPTagCreate
+		}
 	}
 
 	// Build request
@@ -55,6 +61,11 @@ func (libdm LibDM) attributeRequest(attribute Attribute, action uint8, namespace
 	}
 
 	return resp, nil
+}
+
+// CreateAttribute update an attribute
+func (libdm LibDM) CreateAttribute(attribute Attribute, namespace, name string) (*RestRequestResponse, error) {
+	return libdm.attributeRequest(attribute, 3, namespace, name, nil)
 }
 
 // UpdateAttribute update an attribute
