@@ -141,12 +141,9 @@ func ZipFolder(sourcePath, zipName string, ignoredFiles []string) (string, error
 		if err != nil {
 			return err
 		}
-		fmt.Println("os.Open")
 
 		defer file.Close()
-		fmt.Println("copy...")
 		_, err = io.Copy(writer, file)
-		fmt.Println("copied")
 		return err
 	})
 	fmt.Println("---finished searching and packing---")
