@@ -26,7 +26,6 @@ func decodeBase64(b []byte) []byte {
 func archive(src string, buf io.Writer) error {
 	tw := tar.NewWriter(buf)
 	buff := make([]byte, 1024*1024)
-
 	baseDir := getBaseDir(src)
 
 	// walk through every file in the folder
@@ -41,17 +40,16 @@ func archive(src string, buf io.Writer) error {
 			return err
 		}
 
-		// must provide real name
-		// (see https://golang.org/src/archive/tar/common.go?#L626)
-		filen := file[len(src)+1:]
-		header.Name = filepath.ToSlash(filen)
+		// Set filename
+		header.Name = filepath.ToSlash(file[len(baseDir):])
 
 		// write header
 		if err := tw.WriteHeader(header); err != nil {
 			return err
 		}
 
-		// if not a dir, write file content
+		// can only write file-
+		// contents to archives
 		if !fi.IsDir() {
 			data, err := os.Open(file)
 			if err != nil {
@@ -74,10 +72,17 @@ func archive(src string, buf io.Writer) error {
 	return nil
 }
 
+// Get Base dir without last dir
 func getBaseDir(dir string) string {
 	if strings.HasSuffix(dir, string(filepath.Separator)) {
 		dir = dir[:len(dir)-1]
 	}
 
-	return filepath.Dir(dir)
+	dir = filepath.Dir(dir)
+
+	if !strings.HasSuffix(dir, string(filepath.Separator)) {
+		dir += string(filepath.Separator)
+	}
+
+	return dir
 }
