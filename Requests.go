@@ -178,6 +178,7 @@ type UploadRequestStruct struct {
 	Attributes  FileAttributes `json:"attr,omitempty"`
 	Encryption  string         `json:"e,omitempty"`
 	ReplaceFile uint           `json:"r,omitempty"`
+	Compressed  bool           `json:"compr,omitempty"`
 	Size        int64          `json:"s"`
 }
 

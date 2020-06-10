@@ -11,6 +11,8 @@ import (
 	"mime/multipart"
 	"net/url"
 	"os"
+
+	"github.com/JojiiOfficial/gaw"
 )
 
 // NoProxyWriter use to fill proxyWriter arg in UpdloadFile
@@ -41,6 +43,9 @@ type UploadRequest struct {
 	Buffersize       int
 	fileSizeCallback FileSizeCallback
 	ProxyWriter      WriterProxy
+	NoCompress       bool
+
+	compress bool // Only folders are affected by compressing
 }
 
 // NewUploadRequest create a new uploadrequest
@@ -54,6 +59,12 @@ func (libdm LibDM) NewUploadRequest(name string, attributes FileAttributes) *Upl
 		Name:      name,
 		Attribute: attributes,
 	}
+}
+
+// WithNoCompress don't compress uploaded folders
+func (uploadRequest *UploadRequest) WithNoCompress() *UploadRequest {
+	uploadRequest.NoCompress = true
+	return uploadRequest
 }
 
 // SetFileSizeCallback sets the callback if the filesize is known
@@ -110,6 +121,7 @@ func (uploadRequest *UploadRequest) BuildRequestStruct(Type UploadType) *UploadR
 		Public:      uploadRequest.Public,
 		PublicName:  uploadRequest.Publicname,
 		ReplaceFile: uploadRequest.ReplaceFileID,
+		Compressed:  uploadRequest.compress,
 		UploadType:  Type,
 	}
 }
@@ -165,6 +177,31 @@ func (uploadRequest *UploadRequest) UploadFile(f *os.File, uploadDone chan strin
 
 	// Upload from file using it's io.Reader
 	return uploadRequest.UploadFromReader(f, fi.Size(), uploadDone, cancel)
+}
+
+// UploadCompressedFolder uploads the given folder to the server
+func (uploadRequest *UploadRequest) UploadCompressedFolder(uri string, uploadDone chan string, cancel chan bool) (*UploadResponse, error) {
+	uploadRequest.compress = true
+	uploadRequest.Name += ".tar"
+
+	// Use size of all files in dir as
+	// full upload size
+	size, err := gaw.GetDirSize(uri)
+	if err != nil {
+		return nil, err
+	}
+
+	pr, pw := io.Pipe()
+	defer pr.Close()
+
+	go func() {
+		// Compress dir
+		err = archive(uri, pw)
+		defer pw.Close()
+	}()
+
+	// Upload from compress reader
+	return uploadRequest.UploadFromReader(pr, size, uploadDone, cancel)
 }
 
 // Do does the final upload http request and uploads the src
