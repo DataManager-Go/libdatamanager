@@ -182,7 +182,7 @@ func (uploadRequest *UploadRequest) UploadFile(f *os.File, uploadDone chan strin
 // UploadCompressedFolder uploads the given folder to the server
 func (uploadRequest *UploadRequest) UploadCompressedFolder(uri string, uploadDone chan string, cancel chan bool) (*UploadResponse, error) {
 	uploadRequest.compress = true
-	uploadRequest.Name += ".tar"
+	uploadRequest.Name += ".tar.gz"
 
 	// Use size of all files in dir as
 	// full upload size

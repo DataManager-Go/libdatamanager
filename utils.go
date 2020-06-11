@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	gzip "github.com/klauspost/pgzip"
 )
 
 func encodeBase64(b []byte) []byte {
@@ -24,7 +26,9 @@ func decodeBase64(b []byte) []byte {
 }
 
 func archive(src string, buf io.Writer) error {
-	tw := tar.NewWriter(buf)
+	zr := gzip.NewWriter(buf)
+	tw := tar.NewWriter(zr)
+
 	buff := make([]byte, 1024*1024)
 	baseDir := getBaseDir(src)
 
@@ -66,6 +70,11 @@ func archive(src string, buf io.Writer) error {
 
 	// produce tar
 	if err := tw.Close(); err != nil {
+		return err
+	}
+
+	// produce gzip
+	if err := zr.Close(); err != nil {
 		return err
 	}
 
