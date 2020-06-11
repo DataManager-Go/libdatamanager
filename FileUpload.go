@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"os"
 
+	gzip "github.com/klauspost/pgzip"
+
 	"github.com/JojiiOfficial/gaw"
 )
 
@@ -43,9 +45,8 @@ type UploadRequest struct {
 	Buffersize       int
 	fileSizeCallback FileSizeCallback
 	ProxyWriter      WriterProxy
-	NoCompress       bool
-
-	compress bool // Only folders are affected by compressing
+	Archive          bool
+	Compressed       bool
 }
 
 // NewUploadRequest create a new uploadrequest
@@ -61,9 +62,9 @@ func (libdm LibDM) NewUploadRequest(name string, attributes FileAttributes) *Upl
 	}
 }
 
-// WithNoCompress don't compress uploaded folders
-func (uploadRequest *UploadRequest) WithNoCompress() *UploadRequest {
-	uploadRequest.NoCompress = true
+// Compress the uploaded file
+func (uploadRequest *UploadRequest) Compress() *UploadRequest {
+	uploadRequest.Compressed = true
 	return uploadRequest
 }
 
@@ -121,7 +122,8 @@ func (uploadRequest *UploadRequest) BuildRequestStruct(Type UploadType) *UploadR
 		Public:      uploadRequest.Public,
 		PublicName:  uploadRequest.Publicname,
 		ReplaceFile: uploadRequest.ReplaceFileID,
-		Compressed:  uploadRequest.compress,
+		Archived:    uploadRequest.Archive,
+		Compressed:  uploadRequest.Compressed,
 		UploadType:  Type,
 	}
 }
@@ -179,10 +181,9 @@ func (uploadRequest *UploadRequest) UploadFile(f *os.File, uploadDone chan strin
 	return uploadRequest.UploadFromReader(f, fi.Size(), uploadDone, cancel)
 }
 
-// UploadCompressedFolder uploads the given folder to the server
-func (uploadRequest *UploadRequest) UploadCompressedFolder(uri string, uploadDone chan string, cancel chan bool) (*UploadResponse, error) {
-	uploadRequest.compress = true
-	uploadRequest.Name += ".tar.gz"
+// UploadArchivedFolder uploads the given folder to the server
+func (uploadRequest *UploadRequest) UploadArchivedFolder(uri string, uploadDone chan string, cancel chan bool) (*UploadResponse, error) {
+	uploadRequest.Archive = true
 
 	// Use size of all files in dir as
 	// full upload size
@@ -268,7 +269,14 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 		// Create hashobject and use a multiwriter to
 		// write to the part and the hash at thes
 		hash := crc32.NewIEEE()
+		var gzipWriter *gzip.Writer
 		writer := io.MultiWriter((uploadRequest.GetProxy()(partW)), hash)
+
+		// Compress Upload if desired
+		if uploadRequest.Compressed {
+			gzipWriter = gzip.NewWriter(writer)
+			writer = gzipWriter
+		}
 
 		buf := make([]byte, uploadRequest.GetBuffersize())
 
@@ -279,6 +287,12 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 			err = EncryptAES(reader, writer, uploadRequest.EncryptionKey, buf, cancel)
 		case "":
 			err = cancelledCopy(writer, reader, buf, cancel)
+		}
+
+		// If compression is used, the
+		// gzipWriter must be closed first
+		if uploadRequest.Compressed {
+			gzipWriter.Close()
 		}
 
 		// Close everything and write into doneChan
