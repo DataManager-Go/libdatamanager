@@ -12,14 +12,18 @@ import (
 	"net/url"
 	"os"
 
-	gzip "github.com/klauspost/pgzip"
-
 	"github.com/JojiiOfficial/gaw"
+	gzip "github.com/klauspost/pgzip"
 )
 
 // NoProxyWriter use to fill proxyWriter arg in UpdloadFile
 var NoProxyWriter WriterProxy = func(w io.Writer) io.Writer {
 	return w
+}
+
+// NoProxyReader use to fill proxyWriter arg in UpdloadFile
+var NoProxyReader ReaderProxy = func(r io.Reader) io.Reader {
+	return r
 }
 
 var (
@@ -45,6 +49,7 @@ type UploadRequest struct {
 	Buffersize       int
 	fileSizeCallback FileSizeCallback
 	ProxyWriter      WriterProxy
+	ProxyReader      ReaderProxy
 	Archive          bool
 	Compressed       bool
 }
@@ -74,8 +79,17 @@ func (uploadRequest *UploadRequest) SetFileSizeCallback(cb FileSizeCallback) *Up
 	return uploadRequest
 }
 
-// GetProxy returns proxywriter for uploadRequest
-func (uploadRequest *UploadRequest) GetProxy() WriterProxy {
+// GetReaderProxy returns proxyReader for uploadRequest
+func (uploadRequest *UploadRequest) GetReaderProxy() ReaderProxy {
+	if uploadRequest.ProxyReader == nil {
+		return NoProxyReader
+	}
+
+	return uploadRequest.ProxyReader
+}
+
+// GetWriterProxy returns proxywriter for uploadRequest
+func (uploadRequest *UploadRequest) GetWriterProxy() WriterProxy {
 	if uploadRequest.ProxyWriter == nil {
 		return NoProxyWriter
 	}
@@ -233,6 +247,9 @@ func (uploadRequest *UploadRequest) Do(body io.Reader, payload interface{}, cont
 
 // UploadBodyBuilder build the body for the upload file request
 func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize int64, doneChan chan string, cancel chan bool) (r *io.PipeReader, contentType string, size int64) {
+	// Apply readerproxy
+	reader = uploadRequest.GetReaderProxy()(reader)
+
 	// Don't calculate a size if inputsize
 	// is empty to prevent returning an inalid size
 	if inpSize > 0 {
@@ -270,7 +287,7 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 		// write to the part and the hash at thes
 		hash := crc32.NewIEEE()
 		var gzipWriter *gzip.Writer
-		writer := io.MultiWriter((uploadRequest.GetProxy()(partW)), hash)
+		writer := io.MultiWriter((uploadRequest.GetWriterProxy()(partW)), hash)
 
 		// Compress Upload if desired
 		if uploadRequest.Compressed {

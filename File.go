@@ -59,6 +59,9 @@ const (
 // WriterProxy proxy writing
 type WriterProxy func(io.Writer) io.Writer
 
+// ReaderProxy proxy writing
+type ReaderProxy func(io.Reader) io.Reader
+
 // FileSizeCallback gets called if the filesize is known
 type FileSizeCallback func(int64)
 
