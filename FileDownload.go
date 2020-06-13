@@ -34,7 +34,8 @@ type FileDownloadRequest struct {
 	Buffersize     int
 	ignoreChecksum bool
 	CancelDownload chan bool
-	Proxy          WriterProxy
+	WriterProxy    WriterProxy
+	ReaderProxy    ReaderProxy
 }
 
 // NewFileRequest create a new filerequest
@@ -70,13 +71,22 @@ func (libdm LibDM) NewFileRequestByID(fileID uint) *FileDownloadRequest {
 	}
 }
 
-// GetProxy returns proxywriter of request
-func (fileRequest *FileDownloadRequest) GetProxy() WriterProxy {
-	if fileRequest.Proxy == nil {
+// GetWriterProxy returns proxywriter of request
+func (fileRequest *FileDownloadRequest) GetWriterProxy() WriterProxy {
+	if fileRequest.WriterProxy == nil {
 		return NoProxyWriter
 	}
 
-	return fileRequest.Proxy
+	return fileRequest.WriterProxy
+}
+
+// GetReaderProxy of request
+func (fileRequest *FileDownloadRequest) GetReaderProxy() ReaderProxy {
+	if fileRequest.ReaderProxy == nil {
+		return NoProxyReader
+	}
+
+	return fileRequest.ReaderProxy
 }
 
 // GetBuffersize gets the buffersize
@@ -183,7 +193,7 @@ func (fileresponse *FileDownloadResponse) WriteToFile(localFilePath string, fmod
 	}
 
 	// Save body to file using given proxy
-	err = fileresponse.SaveTo(fileresponse.DownloadRequest.GetProxy()(f), cancelChan)
+	err = fileresponse.SaveTo(fileresponse.DownloadRequest.GetWriterProxy()(f), cancelChan)
 	if err != nil {
 		return err
 	}
@@ -218,7 +228,7 @@ func (fileRequest *FileDownloadRequest) DownloadToFile(localFilePath string, fmo
 	}
 
 	// Write to file
-	err = resp.SaveTo((fileRequest.GetProxy()(f)), fileRequest.CancelDownload)
+	err = resp.SaveTo((fileRequest.GetWriterProxy()(f)), fileRequest.CancelDownload)
 	if err != nil {
 		return nil, err
 	}
@@ -256,6 +266,9 @@ func (fileresponse *FileDownloadResponse) SaveTo(w io.Writer, cancelChan chan bo
 	buff := make([]byte, fileresponse.DownloadRequest.GetBuffersize())
 	hash := crc32.NewIEEE()
 
+	// Apply ReaderProxy
+	reader := fileresponse.DownloadRequest.GetReaderProxy()(fileresponse.Response.Body)
+
 	// If decryption is requested and required
 	if fileresponse.DownloadRequest.Decrypt && len(fileresponse.Encryption) > 0 {
 		// Throw error if no key was given
@@ -266,14 +279,14 @@ func (fileresponse *FileDownloadResponse) SaveTo(w io.Writer, cancelChan chan bo
 		switch fileresponse.Encryption {
 		case EncryptionCiphers[0]:
 			// Decrypt aes
-			err = DecryptAES(fileresponse.Response.Body, w, hash, fileresponse.DownloadRequest.Key, buff, fileresponse.DownloadRequest.CancelDownload)
+			err = DecryptAES(reader, w, hash, fileresponse.DownloadRequest.Key, buff, fileresponse.DownloadRequest.CancelDownload)
 		default:
 			return ErrCipherNotSupported
 		}
 	} else {
 		// Use multiwriter to write to hash and file
 		// at the same time
-		err = cancelledCopy(io.MultiWriter(w, hash), fileresponse.Response.Body, buff, cancelChan)
+		err = cancelledCopy(io.MultiWriter(w, hash), reader, buff, cancelChan)
 	}
 
 	if err != nil {
