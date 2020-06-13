@@ -106,15 +106,16 @@ func (rc RequestConfig) GetBearerAuth() Authorization {
 
 // Request a rest server request
 type Request struct {
-	RequestType   RequestType
-	Endpoint      Endpoint
-	Payload       interface{}
-	Config        *RequestConfig
-	Method        Method
-	ContentType   ContentType
-	Authorization *Authorization
-	Headers       map[string]string
-	BenchChan     chan time.Time
+	RequestType           RequestType
+	Endpoint              Endpoint
+	Payload               interface{}
+	Config                *RequestConfig
+	Method                Method
+	ContentType           ContentType
+	Authorization         *Authorization
+	Headers               map[string]string
+	BenchChan             chan time.Time
+	MaxConnectionsPerHost int
 }
 
 // FileListRequest contains file info (and a file)
@@ -204,13 +205,20 @@ const (
 // NewRequest creates a new post request
 func (limdm *LibDM) NewRequest(endpoint Endpoint, payload interface{}) *Request {
 	return &Request{
-		RequestType: JSONRequestType,
-		Endpoint:    endpoint,
-		Payload:     payload,
-		Config:      limdm.Config,
-		Method:      POST,
-		ContentType: JSONContentType,
+		RequestType:           JSONRequestType,
+		Endpoint:              endpoint,
+		Payload:               payload,
+		Config:                limdm.Config,
+		Method:                POST,
+		ContentType:           JSONContentType,
+		MaxConnectionsPerHost: 1,
 	}
+}
+
+// WithConnectionLimit set limit of max connectionts per host
+func (request *Request) WithConnectionLimit(maxConnections int) *Request {
+	request.MaxConnectionsPerHost = maxConnections
+	return request
 }
 
 // WithMethod use a different method
@@ -264,9 +272,13 @@ func (request *Request) WithHeader(name string, value string) *Request {
 func (request *Request) BuildClient() *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
+			MaxConnsPerHost: request.MaxConnectionsPerHost,
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: request.Config.IgnoreCert,
 			},
+			MaxIdleConns:        5,
+			MaxIdleConnsPerHost: 5,
+			DisableKeepAlives:   true,
 		},
 		Timeout: 0,
 	}
@@ -331,15 +343,11 @@ func (request *Request) DoHTTPRequest() (*http.Response, error) {
 // Do a better request method
 func (request Request) Do(retVar interface{}) (*RestRequestResponse, error) {
 	resp, err := request.DoHTTPRequest()
-
-	// Call bench callbac
-	if request.BenchChan != nil {
-		request.BenchChan <- time.Now()
-	}
-
-	if err != nil {
+	if err != nil || resp == nil {
 		return nil, err
 	}
+
+	defer resp.Body.Close()
 
 	var response *RestRequestResponse
 
@@ -377,8 +385,6 @@ func (request Request) Do(retVar interface{}) (*RestRequestResponse, error) {
 			return nil, err
 		}
 	}
-
-	resp.Body.Close()
 
 	return response, nil
 }
