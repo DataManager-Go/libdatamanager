@@ -70,6 +70,7 @@ type clientConfig struct {
 	SkipKeystoreCheck    bool
 	HideKeystoreWarnings bool
 	Defaults             clientDefaults
+	BenchResult          int
 }
 
 type clientDefaults struct {
