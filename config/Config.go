@@ -319,7 +319,13 @@ func (config *Config) MustSetToken(token string) {
 
 // GetToken returns user token
 func (config *Config) GetToken() (string, error) {
-	token, err := keyring.Get(KeyringServiceName, config.User.Username)
+	var token string
+	var err error
+
+	// Don't try to read from keyring if disabled
+	if !config.User.DisableKeyring {
+		token, err = keyring.Get(KeyringServiceName, config.User.Username)
+	}
 
 	if config.User.DisableKeyring || err != nil {
 		// Return unlock error if sessiontoken is empty,
