@@ -3,6 +3,7 @@ package libdatamanager
 import (
 	"archive/tar"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -24,46 +25,84 @@ func decodeBase64(b []byte) []byte {
 }
 
 func archive(src string, buf io.Writer) error {
-	tw := tar.NewWriter(buf)
+	maxErrors := 10
 
+	tw := tar.NewWriter(buf)
 	buff := make([]byte, 1024*1024)
-	baseDir := getBaseDir(src)
+	// baseDir := getBaseDir(src)
+
+	errChan := make(chan error, maxErrors)
 
 	// walk through every file in the folder
-	filepath.Walk(src, func(file string, fi os.FileInfo, err error) error {
-		if len(file) < len(src)+1 {
-			return nil
-		}
+	go func() {
+		filepath.Walk(src, func(file string, fi os.FileInfo, err error) error {
+			if len(file) < len(src)+1 {
+				return nil
+			}
 
-		// generate tar header
-		header, err := tar.FileInfoHeader(fi, file)
-		if err != nil {
-			return err
-		}
+			// Follow link
+			var link string
+			if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
+				if link, err = os.Readlink(file); err != nil {
+					errChan <- err
+					return nil
+				}
+			}
 
-		// Set filename
-		header.Name = filepath.ToSlash(file[len(baseDir):])
-
-		// write header
-		if err := tw.WriteHeader(header); err != nil {
-			return err
-		}
-
-		// can only write file-
-		// contents to archives
-		if !fi.IsDir() {
-			data, err := os.Open(file)
+			// Generate tar header
+			header, err := tar.FileInfoHeader(fi, link)
 			if err != nil {
-				return err
+				errChan <- err
+				return nil
 			}
 
-			if _, err := io.CopyBuffer(tw, data, buff); err != nil {
-				return err
+			// Set filename
+			header.Name = filepath.Join(src, strings.TrimPrefix(file, src))
+			//header.Name = filepath.ToSlash(file)
+
+			// write header
+			if err := tw.WriteHeader(header); err != nil {
+				errChan <- err
+				return nil
 			}
+
+			// Nothing more to do for non-regular
+			if !fi.Mode().IsRegular() {
+				return nil
+			}
+
+			// can only write file-
+			// contents to archives
+			if !fi.IsDir() {
+				data, err := os.Open(file)
+				if err != nil {
+					errChan <- err
+					return nil
+				}
+
+				if _, err := io.CopyBuffer(tw, data, buff); err != nil {
+					errChan <- err
+					return nil
+				}
+
+				data.Close()
+			}
+
+			return nil
+		})
+
+		close(errChan)
+	}()
+
+	errCounter := 0
+	for err := range errChan {
+		if errCounter >= maxErrors {
+			return errors.New("Too many errors")
 		}
 
-		return nil
-	})
+		fmt.Println(err)
+		errCounter++
+	}
 
 	// produce tar
 	if err := tw.Close(); err != nil {

@@ -206,17 +206,38 @@ func (uploadRequest *UploadRequest) UploadArchivedFolder(uri string, uploadDone 
 		return nil, err
 	}
 
+	errChan := make(chan error, 1)
+	doneChan := make(chan struct{}, 1)
+
 	pr, pw := io.Pipe()
 	defer pr.Close()
 
 	go func() {
 		// Compress dir
-		err = archive(uri, pw)
+		if err := archive(uri, pw); err != nil {
+			errChan <- err
+		}
 		defer pw.Close()
 	}()
 
-	// Upload from compress reader
-	return uploadRequest.UploadFromReader(pr, size, uploadDone, cancel)
+	var resp *UploadResponse
+	go func() {
+		// Upload from compress reader
+		resp, err = uploadRequest.UploadFromReader(pr, size, uploadDone, cancel)
+		if err != nil {
+			errChan <- err
+		} else {
+			doneChan <- struct{}{}
+		}
+	}()
+
+	select {
+	case err := <-errChan:
+		uploadDone <- ""
+		return nil, err
+	case <-doneChan:
+		return resp, nil
+	}
 }
 
 // Do does the final upload http request and uploads the src
