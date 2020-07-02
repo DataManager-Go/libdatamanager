@@ -107,7 +107,7 @@ func EncryptAES(in io.Reader, out io.Writer, keyAes, buff []byte, cancel chan bo
 }
 
 // DecryptAES decrypt stuff
-func DecryptAES(in io.Reader, out, hashwriter io.Writer, keyAes, buff []byte, cancelChan chan bool) (err error) {
+func DecryptAES(in io.Reader, out, hashwriter *io.Writer, keyAes, buff []byte, cancelChan chan bool) (err error) {
 	// Iv is always 16 bytes
 	iv := make([]byte, 16)
 
@@ -130,7 +130,9 @@ func DecryptAES(in io.Reader, out, hashwriter io.Writer, keyAes, buff []byte, ca
 
 	// Write iv to hasher cause the servers
 	// hash is built on it too
-	hashwriter.Write(iv)
+	if hashwriter != nil {
+		(*hashwriter).Write(iv)
+	}
 	ctr := cipher.NewCTR(aes, iv)
 
 	// Decrypt using xor keystream the
@@ -155,8 +157,11 @@ func DecryptAES(in io.Reader, out, hashwriter io.Writer, keyAes, buff []byte, ca
 			outBuf := make([]byte, n)
 			ctr.XORKeyStream(outBuf, buff[:n])
 
-			out.Write(outBuf)
-			hashwriter.Write(buff[:n])
+			(*out).Write(outBuf)
+
+			if hashwriter != nil {
+				(*hashwriter).Write(buff[:n])
+			}
 		}
 
 		// Treat eof as stop condition, not as

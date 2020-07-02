@@ -1,6 +1,7 @@
 package libdatamanager
 
 import (
+	"compress/gzip"
 	"encoding/hex"
 	"errors"
 	"hash/crc32"
@@ -250,6 +251,7 @@ type FileDownloadResponse struct {
 	Size            int64
 	Encryption      string
 	FileID          uint
+	Extract         bool
 	DownloadRequest *FileDownloadRequest
 }
 
@@ -266,8 +268,22 @@ func (fileresponse *FileDownloadResponse) SaveTo(w io.Writer, cancelChan chan bo
 	buff := make([]byte, fileresponse.DownloadRequest.GetBuffersize())
 	hash := crc32.NewIEEE()
 
-	// Apply ReaderProxy
-	reader := fileresponse.DownloadRequest.GetReaderProxy()(fileresponse.Response.Body)
+	reader := io.TeeReader(fileresponse.Response.Body, hash)
+
+	var gz *gzip.Reader
+	// TODO let the server decide whether to
+	// extract. Otherwise compressed files
+	// can't be decrypted correctly!!
+	if fileresponse.Extract {
+		gz, err = gzip.NewReader(reader)
+		if err != nil {
+			return err
+		}
+
+		reader = gz
+	}
+
+	w = fileresponse.DownloadRequest.GetWriterProxy()(w)
 
 	// If decryption is requested and required
 	if fileresponse.DownloadRequest.Decrypt && len(fileresponse.Encryption) > 0 {
@@ -279,14 +295,19 @@ func (fileresponse *FileDownloadResponse) SaveTo(w io.Writer, cancelChan chan bo
 		switch fileresponse.Encryption {
 		case EncryptionCiphers[0]:
 			// Decrypt aes
-			err = DecryptAES(reader, w, hash, fileresponse.DownloadRequest.Key, buff, fileresponse.DownloadRequest.CancelDownload)
+			err = DecryptAES(reader, &w, nil, fileresponse.DownloadRequest.Key, buff, fileresponse.DownloadRequest.CancelDownload)
 		default:
 			return ErrCipherNotSupported
 		}
 	} else {
 		// Use multiwriter to write to hash and file
 		// at the same time
-		err = cancelledCopy(io.MultiWriter(w, hash), reader, buff, cancelChan)
+		err = cancelledCopy(w, reader, buff, cancelChan)
+	}
+
+	// Close gzipWriter
+	if fileresponse.Extract {
+		gz.Close()
 	}
 
 	if err != nil {
