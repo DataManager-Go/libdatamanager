@@ -1,9 +1,9 @@
 package libdatamanager
 
 import (
-	"compress/gzip"
 	"encoding/hex"
 	"errors"
+	gzip "github.com/klauspost/pgzip"
 	"hash/crc32"
 	"io"
 	"net/http"
