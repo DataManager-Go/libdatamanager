@@ -3,13 +3,14 @@ package libdatamanager
 import (
 	"encoding/hex"
 	"errors"
-	gzip "github.com/klauspost/pgzip"
 	"hash/crc32"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	gzip "github.com/klauspost/pgzip"
 )
 
 var (
@@ -194,7 +195,7 @@ func (fileresponse *FileDownloadResponse) WriteToFile(localFilePath string, fmod
 	}
 
 	// Save body to file using given proxy
-	err = fileresponse.SaveTo(fileresponse.DownloadRequest.GetWriterProxy()(f), cancelChan)
+	err = fileresponse.SaveTo(f, cancelChan)
 	if err != nil {
 		return err
 	}
@@ -229,7 +230,7 @@ func (fileRequest *FileDownloadRequest) DownloadToFile(localFilePath string, fmo
 	}
 
 	// Write to file
-	err = resp.SaveTo((fileRequest.GetWriterProxy()(f)), fileRequest.CancelDownload)
+	err = resp.SaveTo(f, fileRequest.CancelDownload)
 	if err != nil {
 		return nil, err
 	}
@@ -268,7 +269,7 @@ func (fileresponse *FileDownloadResponse) SaveTo(w io.Writer, cancelChan chan bo
 	buff := make([]byte, fileresponse.DownloadRequest.GetBuffersize())
 	hash := crc32.NewIEEE()
 
-	reader := io.TeeReader(fileresponse.Response.Body, hash)
+	reader := io.TeeReader(fileresponse.DownloadRequest.GetReaderProxy()(fileresponse.Response.Body), hash)
 
 	var gz *gzip.Reader
 	// TODO let the server decide whether to
