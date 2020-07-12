@@ -36,6 +36,19 @@ func (libdm LibDM) Register(username, password string) (*RestRequestResponse, er
 	return resp, nil
 }
 
+// Stats for user
+func (libdm LibDM) Stats(namespace string) (*StatsResponse, error) {
+	var response StatsResponse
+
+	if _, err := libdm.Request(EPUserStats, &StatsRequestStruct{
+		Namespace: namespace,
+	}, &response, true); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
 // Ping pings a server the REST way to
 // ensure it is reachable
 func (libdm LibDM) Ping() (*StringResponse, error) {

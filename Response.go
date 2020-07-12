@@ -112,3 +112,19 @@ type Namespaceinfo struct {
 	Name   string   `json:"ns"`
 	Groups []string `json:"groups"`
 }
+
+// StatsResponse for user stats request
+type StatsResponse struct {
+	TrafficUsed int64
+
+	// Files
+	FilesUploaded int64
+	DeletedFiles  int64
+	FileCount     int64
+	TotalFileSize int64
+
+	// Namespace
+	NamespaceCount int64
+	GroupCount     int64
+	TagCount       int64
+}

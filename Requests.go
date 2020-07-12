@@ -47,18 +47,18 @@ const (
 	EPPing Endpoint = "/ping"
 
 	// User
-	EPUser     Endpoint = "/user"
-	EPLogin    Endpoint = EPUser + "/login"
-	EPRegister Endpoint = EPUser + "/register"
+	EPUser      Endpoint = "/user"
+	EPLogin              = EPUser + "/login"
+	EPRegister           = EPUser + "/register"
+	EPUserStats          = EPUser + "/stats"
 
 	// Files
-	EPFile Endpoint = "/file"
-
-	EPFileList    Endpoint = EPFile + "s"
-	EPFileUpdate  Endpoint = EPFile + "/update"
-	EPFileDelete  Endpoint = EPFile + "/delete"
-	EPFileGet     Endpoint = EPFile + "/get"
-	EPFilePublish Endpoint = EPFile + "/publish"
+	EPFile        Endpoint = "/file"
+	EPFileList             = EPFile + "s"
+	EPFileUpdate           = EPFile + "/update"
+	EPFileDelete           = EPFile + "/delete"
+	EPFileGet              = EPFile + "/get"
+	EPFilePublish          = EPFile + "/publish"
 
 	// Upload
 	EPFileUpload Endpoint = "/upload" + EPFile
@@ -182,6 +182,11 @@ type UploadRequestStruct struct {
 	Compressed  bool           `json:"compr,omitempty"`
 	Archived    bool           `json:"arved,omitempty"`
 	Size        int64          `json:"s"`
+}
+
+// StatsRequestStruct informations about a stat-request
+type StatsRequestStruct struct {
+	Namespace string `json:"ns,omitempty"`
 }
 
 // UploadType type of upload
