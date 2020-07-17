@@ -171,17 +171,21 @@ type UserAttributesRequest struct {
 
 // UploadRequestStruct contains file info (and a file)
 type UploadRequestStruct struct {
-	UploadType  UploadType     `json:"type"`
-	URL         string         `json:"url,omitempty"`
-	Name        string         `json:"name"`
-	Public      bool           `json:"pb,omitempty"`
-	PublicName  string         `json:"pbname,omitempty"`
-	Attributes  FileAttributes `json:"attr,omitempty"`
-	Encryption  string         `json:"e,omitempty"`
-	ReplaceFile uint           `json:"r,omitempty"`
-	Compressed  bool           `json:"compr,omitempty"`
-	Archived    bool           `json:"arved,omitempty"`
-	Size        int64          `json:"s"`
+	// Required fields
+	UploadType UploadType `json:"type"`
+	Name       string     `json:"name"`
+
+	// Optional fields
+	URL               string         `json:"url,omitempty"`
+	Public            bool           `json:"pb,omitempty"`
+	PublicName        string         `json:"pbname,omitempty"`
+	Attributes        FileAttributes `json:"attr,omitempty"`
+	Encryption        string         `json:"e,omitempty"`
+	Compressed        bool           `json:"compr,omitempty"`
+	Archived          bool           `json:"arved,omitempty"`
+	ReplaceFileByID   uint           `json:"r,omitempty"`
+	ReplaceEqualNames bool           `json:"ren"`
+	All               bool           `json:"a"`
 }
 
 // StatsRequestStruct informations about a stat-request

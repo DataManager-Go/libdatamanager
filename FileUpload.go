@@ -44,6 +44,8 @@ type UploadRequest struct {
 	Public           bool
 	Attribute        FileAttributes
 	ReplaceFileID    uint
+	ReplaceEqualName bool
+	All              bool
 	Encryption       string
 	EncryptionKey    []byte
 	Buffersize       int
@@ -114,8 +116,20 @@ func (uploadRequest *UploadRequest) MakePublic(publicName string) *UploadRequest
 	return uploadRequest
 }
 
-// ReplaceFile replace a file instead creating a new one
-func (uploadRequest *UploadRequest) ReplaceFile(fileID uint) *UploadRequest {
+// ReplaceFileWithSameName replace files with same name
+func (uploadRequest *UploadRequest) ReplaceFileWithSameName() *UploadRequest {
+	uploadRequest.ReplaceEqualName = true
+	return uploadRequest
+}
+
+// HandleAll applies action to all files
+func (uploadRequest *UploadRequest) HandleAll() *UploadRequest {
+	uploadRequest.All = true
+	return uploadRequest
+}
+
+// ReplaceFileByID replace a file instead creating a new one
+func (uploadRequest *UploadRequest) ReplaceFileByID(fileID uint) *UploadRequest {
 	uploadRequest.ReplaceFileID = fileID
 	return uploadRequest
 }
@@ -130,15 +144,17 @@ func (uploadRequest *UploadRequest) Encrypted(encryptionMethod string, key []byt
 // BuildRequestStruct create a uploadRequset struct using Type
 func (uploadRequest *UploadRequest) BuildRequestStruct(Type UploadType) *UploadRequestStruct {
 	return &UploadRequestStruct{
-		Name:        uploadRequest.Name,
-		Attributes:  uploadRequest.Attribute,
-		Encryption:  uploadRequest.Encryption,
-		Public:      uploadRequest.Public,
-		PublicName:  uploadRequest.Publicname,
-		ReplaceFile: uploadRequest.ReplaceFileID,
-		Archived:    uploadRequest.Archive,
-		Compressed:  uploadRequest.Compressed,
-		UploadType:  Type,
+		UploadType:        Type,
+		Name:              uploadRequest.Name,
+		Attributes:        uploadRequest.Attribute,
+		Encryption:        uploadRequest.Encryption,
+		Public:            uploadRequest.Public,
+		PublicName:        uploadRequest.Publicname,
+		ReplaceFileByID:   uploadRequest.ReplaceFileID,
+		Archived:          uploadRequest.Archive,
+		Compressed:        uploadRequest.Compressed,
+		All:               uploadRequest.All,
+		ReplaceEqualNames: uploadRequest.ReplaceEqualName,
 	}
 }
 
@@ -166,7 +182,6 @@ func (uploadRequest *UploadRequest) UploadFromReader(r io.Reader, size int64, up
 	// Build request and body
 	request := uploadRequest.BuildRequestStruct(FileUploadType)
 	body, contenttype, size := uploadRequest.UploadBodyBuilder(r, size, uploadDone, cancel)
-	request.Size = size
 
 	// Run filesize callback if set
 	if uploadRequest.fileSizeCallback != nil {
