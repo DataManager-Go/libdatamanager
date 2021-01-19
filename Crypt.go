@@ -1,6 +1,7 @@
 package libdatamanager
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
@@ -61,11 +62,27 @@ func IsValidCipher(c string) bool {
 	return false
 }
 
+// Extract public key from private key file
+func getPubKeyFromIdentity(b []byte) io.Reader {
+	scanner := bufio.NewScanner(bytes.NewBuffer(b))
+
+	// Search for a 'public key entry'
+	for scanner.Scan() {
+		if strings.Contains(scanner.Text(), "public key:") {
+			return bytes.NewBufferString(strings.TrimSpace(strings.Split(scanner.Text(), ":")[1]))
+		}
+
+		if strings.HasPrefix(scanner.Text(), "age") {
+			return bytes.NewBufferString(scanner.Text())
+		}
+	}
+
+	return bytes.NewBuffer(b)
+}
+
 // EncryptAGE encrypts input stream and writes it to out
 func EncryptAGE(out io.Writer, in io.Reader, key, buff []byte, cancel chan bool) (err error) {
-	recB := bytes.NewBuffer(key)
-	// TODO get pub key from private key
-	rec, err := age.ParseRecipients(recB)
+	rec, err := age.ParseRecipients(getPubKeyFromIdentity(key))
 	if err != nil {
 		return err
 	}

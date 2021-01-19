@@ -3,7 +3,6 @@ package libdatamanager
 import (
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"hash/crc32"
 	"io"
 	"net/http"
@@ -286,7 +285,6 @@ func (fileresponse *FileDownloadResponse) SaveTo(w io.Writer, cancelChan chan bo
 	}
 
 	w = fileresponse.DownloadRequest.GetWriterProxy()(w)
-	fmt.Println(fileresponse.Encryption)
 
 	// If decryption is requested and required
 	if fileresponse.DownloadRequest.Decrypt && len(fileresponse.Encryption) > 0 {
