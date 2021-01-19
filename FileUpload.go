@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"hash/crc32"
 	"io"
 	"mime/multipart"
@@ -183,6 +184,10 @@ func (uploadRequest *UploadRequest) UploadFromReader(r io.Reader, size int64, up
 	request := uploadRequest.BuildRequestStruct(FileUploadType)
 	body, contenttype, size := uploadRequest.UploadBodyBuilder(r, size, uploadDone, cancel)
 
+	if body == nil {
+		return nil, fmt.Errorf("body is nil")
+	}
+
 	// Run filesize callback if set
 	if uploadRequest.fileSizeCallback != nil {
 		uploadRequest.fileSizeCallback(size)
@@ -293,6 +298,8 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 		switch uploadRequest.Encryption {
 		case EncryptionCiphers[0]:
 			size = inpSize + aes.BlockSize
+		case EncryptionCiphers[1]:
+			size = inpSize
 		case "":
 			size = inpSize
 		default:
@@ -337,7 +344,9 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 		// to support encryption
 		switch uploadRequest.Encryption {
 		case EncryptionCiphers[0]:
-			err = EncryptAES(reader, writer, uploadRequest.EncryptionKey, buf, cancel)
+			err = EncryptAES(writer, reader, uploadRequest.EncryptionKey, buf, cancel)
+		case EncryptionCiphers[1]:
+			err = EncryptAGE(writer, reader, uploadRequest.EncryptionKey, buf, cancel)
 		case "":
 			err = cancelledCopy(writer, reader, buf, cancel)
 		}

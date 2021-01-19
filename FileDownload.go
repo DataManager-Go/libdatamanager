@@ -3,6 +3,7 @@ package libdatamanager
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"hash/crc32"
 	"io"
 	"net/http"
@@ -285,6 +286,7 @@ func (fileresponse *FileDownloadResponse) SaveTo(w io.Writer, cancelChan chan bo
 	}
 
 	w = fileresponse.DownloadRequest.GetWriterProxy()(w)
+	fmt.Println(fileresponse.Encryption)
 
 	// If decryption is requested and required
 	if fileresponse.DownloadRequest.Decrypt && len(fileresponse.Encryption) > 0 {
@@ -297,6 +299,9 @@ func (fileresponse *FileDownloadResponse) SaveTo(w io.Writer, cancelChan chan bo
 		case EncryptionCiphers[0]:
 			// Decrypt aes
 			err = DecryptAES(reader, &w, nil, fileresponse.DownloadRequest.Key, buff, fileresponse.DownloadRequest.CancelDownload)
+		case EncryptionCiphers[1]:
+			// Decrypt aes
+			err = DecryptAGE(reader, w, nil, fileresponse.DownloadRequest.Key, buff, fileresponse.DownloadRequest.CancelDownload)
 		default:
 			return ErrCipherNotSupported
 		}

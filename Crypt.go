@@ -1,6 +1,7 @@
 package libdatamanager
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -8,11 +9,14 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"filippo.io/age"
 )
 
-// EncryptionCiphers supported encryption chipers
+// EncryptionCiphers supported encryption method
 var EncryptionCiphers = []string{
 	"aes",
+	"age",
 }
 
 // ChiperToInt cipter to int
@@ -57,8 +61,48 @@ func IsValidCipher(c string) bool {
 	return false
 }
 
+// EncryptAGE encrypts input stream and writes it to out
+func EncryptAGE(out io.Writer, in io.Reader, key, buff []byte, cancel chan bool) (err error) {
+	recB := bytes.NewBuffer(key)
+	// TODO get pub key from private key
+	rec, err := age.ParseRecipients(recB)
+	if err != nil {
+		return err
+	}
+
+	enWriter, nil := age.Encrypt(out, rec...)
+	if err != nil {
+		return err
+	}
+	defer enWriter.Close()
+
+	for {
+		// Stop on cancel
+		select {
+		case <-cancel:
+			return ErrCancelled
+		default:
+		}
+
+		n, err := in.Read(buff)
+		if err != nil && err != io.EOF {
+			return err
+		}
+
+		if n != 0 {
+			enWriter.Write(buff[:n])
+		}
+
+		if err == io.EOF {
+			break
+		}
+	}
+
+	return nil
+}
+
 // EncryptAES encrypts input stream and writes it to out
-func EncryptAES(in io.Reader, out io.Writer, keyAes, buff []byte, cancel chan bool) (err error) {
+func EncryptAES(out io.Writer, in io.Reader, keyAes, buff []byte, cancel chan bool) (err error) {
 	iv := make([]byte, 16)
 
 	// Create random iv
@@ -93,11 +137,59 @@ func EncryptAES(in io.Reader, out io.Writer, keyAes, buff []byte, cancel chan bo
 		}
 
 		if n != 0 {
+			// TODO can we outsource this?
 			outBuf := make([]byte, n)
+
 			ctr.XORKeyStream(outBuf, buff[:n])
 			out.Write(outBuf)
 		}
 
+		if err == io.EOF {
+			break
+		}
+	}
+
+	return nil
+}
+
+// DecryptAGE decrypt stuff
+func DecryptAGE(in io.Reader, out, hashwriter io.Writer, key, buff []byte, cancelChan chan bool) (err error) {
+	id, err := age.ParseIdentities(bytes.NewBuffer(key))
+	if err != nil {
+		return err
+	}
+
+	decReader, err := age.Decrypt(in, id...)
+	if err != nil {
+		return err
+	}
+
+	for {
+		// return on cancel
+		select {
+		case <-cancelChan:
+			return ErrCancelled
+		default:
+		}
+
+		n, err := decReader.Read(buff)
+		if err != nil && err != io.EOF {
+			return err
+		}
+
+		if n != 0 {
+			_, err = out.Write(buff[:n])
+			if err != nil {
+				return err
+			}
+
+			if hashwriter != nil {
+				hashwriter.Write(buff[:n])
+			}
+		}
+
+		// Treat eof as stop condition, not as
+		// an error
 		if err == io.EOF {
 			break
 		}
@@ -154,7 +246,9 @@ func DecryptAES(in io.Reader, out, hashwriter *io.Writer, keyAes, buff []byte, c
 		}
 
 		if n != 0 {
+			// TODO can we outsource this?
 			outBuf := make([]byte, n)
+
 			ctr.XORKeyStream(outBuf, buff[:n])
 
 			(*out).Write(outBuf)
