@@ -89,9 +89,9 @@ func EncryptAGE(out io.Writer, in io.Reader, key, buff []byte, cancel chan bool)
 
 	enWriter, nil := age.Encrypt(out, rec...)
 	if err != nil {
+
 		return err
 	}
-	defer enWriter.Close()
 
 	for {
 		// Stop on cancel
@@ -107,13 +107,18 @@ func EncryptAGE(out io.Writer, in io.Reader, key, buff []byte, cancel chan bool)
 		}
 
 		if n != 0 {
-			enWriter.Write(buff[:n])
+			_, err := enWriter.Write(buff[:n])
+			if err != nil {
+				return err
+			}
 		}
 
 		if err == io.EOF {
 			break
 		}
 	}
+
+	enWriter.Close()
 
 	return nil
 }

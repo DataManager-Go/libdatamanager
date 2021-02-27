@@ -253,7 +253,9 @@ func (uploadRequest *UploadRequest) UploadArchivedFolder(uri string, uploadDone 
 
 	select {
 	case err := <-errChan:
-		uploadDone <- ""
+		go func() {
+			uploadDone <- ""
+		}()
 		return nil, err
 	case <-doneChan:
 		return resp, nil
@@ -359,6 +361,7 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 
 		// Close everything and write into doneChan
 		multipartW.Close()
+
 		if err != nil {
 			if err != ErrCancelled {
 				pW.CloseWithError(err)
