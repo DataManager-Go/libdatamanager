@@ -3,7 +3,7 @@ module github.com/DataManager-Go/libdatamanager
 go 1.14
 
 require (
-	filippo.io/age v1.0.0-beta6
+	filippo.io/age v1.0.0-rc.1
 	github.com/JojiiOfficial/gaw v1.2.8
 	github.com/jinzhu/gorm v1.9.14
 	github.com/klauspost/compress v1.10.10 // indirect
