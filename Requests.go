@@ -114,6 +114,7 @@ type Request struct {
 	Authorization         *Authorization
 	Headers               map[string]string
 	BenchChan             chan time.Time
+	Compressed            bool
 	MaxConnectionsPerHost int
 }
 
@@ -229,6 +230,12 @@ func (request *Request) WithConnectionLimit(maxConnections int) *Request {
 	return request
 }
 
+// WithCompression use a different method
+func (request *Request) WithCompression(compression bool) *Request {
+	request.Compressed = compression
+	return request
+}
+
 // WithMethod use a different method
 func (request *Request) WithMethod(m Method) *Request {
 	request.Method = m
@@ -335,6 +342,10 @@ func (request *Request) DoHTTPRequest() (*http.Response, error) {
 
 	// Set contenttype header
 	req.Header.Set("Content-Type", string(request.ContentType))
+
+	if request.Compressed {
+		req.Header.Set("Content-Encoding", string("gzip"))
+	}
 
 	for headerKey, headerValue := range request.Headers {
 		req.Header.Set(headerKey, headerValue)

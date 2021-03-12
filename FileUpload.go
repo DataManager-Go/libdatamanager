@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
-	"mime/multipart"
 	"net/url"
 	"os"
 
@@ -30,11 +29,6 @@ var NoProxyReader ReaderProxy = func(r io.Reader) io.Reader {
 var (
 	// ErrUnsupportedScheme error if url has an unsupported scheme
 	ErrUnsupportedScheme = errors.New("Unsupported scheme")
-)
-
-// Boundary boundary for the part
-const (
-	Boundary = "MachliJalKiRaniHaiJeevanUskaPaaniHai"
 )
 
 // UploadRequest a uploadrequest
@@ -276,6 +270,9 @@ func (uploadRequest *UploadRequest) Do(body io.Reader, payload interface{}, cont
 	var resStruct UploadResponse
 	response, err := uploadRequest.NewRequest(EPFileUpload, body).
 		WithMethod(PUT).
+		// Negate the 'Compressed' field, to tell the server
+		// not to decompress the stream
+		WithCompression(!uploadRequest.Compressed).
 		WithAuth(uploadRequest.Config.GetBearerAuth()).WithHeader(HeaderRequest, base64.StdEncoding.EncodeToString(rbody)).
 		WithRequestType(RawRequestType).
 		WithContentType(contentType).
@@ -292,6 +289,7 @@ func (uploadRequest *UploadRequest) Do(body io.Reader, payload interface{}, cont
 func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize int64, doneChan chan string, cancel chan bool) (r *io.PipeReader, contentType string, size int64) {
 	// Apply readerproxy
 	reader = uploadRequest.GetReaderProxy()(reader)
+	var err error
 
 	// Don't calculate a size if inputsize
 	// is empty to prevent returning an inalid size
@@ -307,37 +305,27 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 		default:
 			return nil, "", -1
 		}
-
-		// Add boundary len cause this will be
-		// written as well
-		size += int64(len(Boundary))
 	}
 
 	r, pW := io.Pipe()
 
-	// Create multipart
-	multipartW := multipart.NewWriter(pW)
-	multipartW.SetBoundary(Boundary)
-	contentType = multipartW.FormDataContentType()
-
 	go func() {
-		partW, err := multipartW.CreateFormFile("fakefield", "file")
-		if err != nil {
-			pW.CloseWithError(err)
-			doneChan <- ""
-			return
-		}
-
 		// Create hashobject and use a multiwriter to
 		// write to the part and the hash at thes
+		var writer io.Writer
+		var gzipw *gzip.Writer
 		hash := crc32.NewIEEE()
-		var gzipWriter *gzip.Writer
-		writer := io.MultiWriter((uploadRequest.GetWriterProxy()(partW)), hash)
 
-		// Compress Upload if desired
 		if uploadRequest.Compressed {
-			gzipWriter = gzip.NewWriter(writer)
-			writer = gzipWriter
+			// Server uses gzip stream to build chehcksum
+			// Write zip stream into hash writer as well
+			gzipw = gzip.NewWriter(io.MultiWriter((uploadRequest.GetWriterProxy()(pW)), hash))
+			writer = gzipw
+		} else {
+			// Server uses raw stream to build chehcksum, so put
+			// the hash writer separate
+			gzipw = gzip.NewWriter(uploadRequest.GetWriterProxy()(pW))
+			writer = io.MultiWriter(gzipw, hash)
 		}
 
 		buf := make([]byte, uploadRequest.GetBuffersize())
@@ -353,14 +341,9 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 			err = cancelledCopy(writer, reader, buf, cancel)
 		}
 
-		// If compression is used, the
-		// gzipWriter must be closed first
-		if uploadRequest.Compressed {
-			gzipWriter.Close()
-		}
+		gzipw.Close()
 
 		// Close everything and write into doneChan
-		multipartW.Close()
 
 		if err != nil {
 			if err != ErrCancelled {
