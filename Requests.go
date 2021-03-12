@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"strconv"
 	"time"
 )
 
@@ -57,7 +56,7 @@ const (
 	EPFileList             = EPFile + "s"
 	EPFileUpdate           = EPFile + "/update"
 	EPFileDelete           = EPFile + "/delete"
-	EPFileGet              = EPFile + "/get"
+	EPFileGet              = "/download/file"
 	EPFilePublish          = EPFile + "/publish"
 
 	// Upload
@@ -180,7 +179,7 @@ type UploadRequestStruct struct {
 	Public            bool           `json:"pb,omitempty"`
 	PublicName        string         `json:"pbname,omitempty"`
 	Attributes        FileAttributes `json:"attr,omitempty"`
-	Encryption        string         `json:"e,omitempty"`
+	Encryption        int8           `json:"e,omitempty"`
 	Compressed        bool           `json:"compr,omitempty"`
 	Archived          bool           `json:"arved,omitempty"`
 	ReplaceFileByID   uint           `json:"r,omitempty"`
@@ -365,21 +364,13 @@ func (request Request) Do(retVar interface{}) (*RestRequestResponse, error) {
 		Headers:  &resp.Header,
 	}
 
-	// Read and validate headers
-	statusStr := resp.Header.Get(HeaderStatus)
-	statusMessage := resp.Header.Get(HeaderStatusMessage)
-
-	if len(statusStr) == 0 {
-		return response, ErrInvalidResponseHeaders
+	if resp.StatusCode == 200 {
+		response.Status = ResponseSuccess
+	} else {
+		response.Status = ResponseError
 	}
 
-	statusInt, err := strconv.Atoi(statusStr)
-	if err != nil || (statusInt > 1 || statusInt < 0) {
-		return response, ErrInvalidResponseHeaders
-	}
-
-	response.Status = (ResponseStatus)(uint8(statusInt))
-	response.Message = statusMessage
+	response.Message = ""
 
 	// Only fill retVar if response was successful
 	if response.Status == ResponseSuccess && retVar != nil {
@@ -393,6 +384,21 @@ func (request Request) Do(retVar interface{}) (*RestRequestResponse, error) {
 		if err != nil {
 			return nil, err
 		}
+	} else if response.Status == ResponseError {
+		var errRes ErrorResponse
+
+		// Read response
+		d, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		// Parse response into retVar
+		err = json.Unmarshal(d, &errRes)
+		if err != nil {
+			return nil, err
+		}
+
+		response.Message = fmt.Sprintf("[%d] %s: %s", errRes.Code, errRes.Err, errRes.Message)
 	}
 
 	return response, nil

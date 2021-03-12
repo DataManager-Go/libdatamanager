@@ -15,17 +15,21 @@ import (
 )
 
 // EncryptionCiphers supported encryption method
-var EncryptionCiphers = []string{
-	"aes",
-	"age",
+var EncryptionCiphers = map[int8]string{
+	1: "aes",
+	2: "age",
 }
 
 // ChiperToInt cipter to int
-func ChiperToInt(c string) int32 {
+func ChiperToInt(c string) int8 {
+	if !IsValidCipher(c) {
+		return -1
+	}
+
 	c = strings.ToLower(c)
 	for i, ec := range EncryptionCiphers {
 		if c == strings.ToLower(ec) {
-			return int32(i) + 1
+			return i
 		}
 	}
 
@@ -39,15 +43,6 @@ func EncryptionIValid(i int32) bool {
 	}
 
 	return true
-}
-
-// ChiperToString cipter to int
-func ChiperToString(i int32) string {
-	if !EncryptionIValid(i) {
-		return ""
-	}
-
-	return EncryptionCiphers[i-1]
 }
 
 // IsValidCipher return true if given cipher is valid

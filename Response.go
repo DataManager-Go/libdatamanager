@@ -128,3 +128,9 @@ type StatsResponse struct {
 	GroupCount     int64
 	TagCount       int64
 }
+
+type ErrorResponse struct {
+	Code    uint16 `json:"code"`
+	Err     string `json:"error"`
+	Message string `json:"message"`
+}

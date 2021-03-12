@@ -47,7 +47,7 @@ type UploadRequest struct {
 	ReplaceFileID    uint
 	ReplaceEqualName bool
 	All              bool
-	Encryption       string
+	Encryption       int8
 	EncryptionKey    []byte
 	Buffersize       int
 	fileSizeCallback FileSizeCallback
@@ -136,7 +136,7 @@ func (uploadRequest *UploadRequest) ReplaceFileByID(fileID uint) *UploadRequest 
 }
 
 // Encrypted Upload a file encrypted
-func (uploadRequest *UploadRequest) Encrypted(encryptionMethod string, key []byte) *UploadRequest {
+func (uploadRequest *UploadRequest) Encrypted(encryptionMethod int8, key []byte) *UploadRequest {
 	uploadRequest.Encryption = encryptionMethod
 	uploadRequest.EncryptionKey = key
 	return uploadRequest
@@ -298,11 +298,11 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 	if inpSize > 0 {
 		// Set filesize
 		switch uploadRequest.Encryption {
-		case EncryptionCiphers[0]:
+		case 1:
 			size = inpSize + aes.BlockSize
-		case EncryptionCiphers[1]:
+		case 2:
 			size = inpSize
-		case "":
+		case 0:
 			size = inpSize
 		default:
 			return nil, "", -1
@@ -345,11 +345,11 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 		// Copy from input reader to writer using
 		// to support encryption
 		switch uploadRequest.Encryption {
-		case EncryptionCiphers[0]:
+		case 1:
 			err = EncryptAES(writer, reader, uploadRequest.EncryptionKey, buf, cancel)
-		case EncryptionCiphers[1]:
+		case 2:
 			err = EncryptAGE(writer, reader, uploadRequest.EncryptionKey, buf, cancel)
-		case "":
+		case 0:
 			err = cancelledCopy(writer, reader, buf, cancel)
 		}
 
