@@ -112,17 +112,9 @@ func (libdm LibDM) PublishFile(name string, id uint, publicName string, all bool
 
 	var err error
 	var response *RestRequestResponse
-	var resp interface{}
+	var resp BulkPublishResponse
 
-	if all {
-		var respData BulkPublishResponse
-		response, err = request.Do(&respData)
-		resp = respData
-	} else {
-		var respData PublishResponse
-		response, err = request.Do(&respData)
-		resp = respData
-	}
+	response, err = request.Do(&resp)
 
 	if err != nil || response.Status == ResponseError {
 		return nil, NewErrorFromResponse(response, err)
@@ -132,7 +124,7 @@ func (libdm LibDM) PublishFile(name string, id uint, publicName string, all bool
 }
 
 // UpdateFile updates a file on the server
-func (libdm LibDM) UpdateFile(name string, id uint, namespace string, all bool, changes FileChanges) (*CountResponse, error) {
+func (libdm LibDM) UpdateFile(name string, id uint, namespace string, all bool, changes FileChanges) (*IDsResponse, error) {
 	// Set attributes
 	attributes := FileAttributes{
 		Namespace: namespace,
@@ -157,7 +149,7 @@ func (libdm LibDM) UpdateFile(name string, id uint, namespace string, all bool, 
 		AddGroups:    changes.AddGroups,
 	}
 
-	var response CountResponse
+	var response IDsResponse
 
 	// Do request
 	if _, err := libdm.Request(EPFileUpdate, &FileRequest{
