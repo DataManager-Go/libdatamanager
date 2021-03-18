@@ -341,7 +341,21 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 			err = cancelledCopy(writer, reader, buf, cancel)
 		}
 
-		gzipw.Close()
+		var hsh string
+		if uploadRequest.Compressed {
+			// No server-side decompression will be executed
+			// so append hash to the end after full gzip stream
+			gzipw.Close()
+			hsh = hex.EncodeToString(hash.Sum(nil))
+			pW.Write([]byte(hsh))
+		} else {
+			// Server wil decompress data
+			// so add hash to the end and gzip
+			// it as well
+			hsh = hex.EncodeToString(hash.Sum(nil))
+			writer.Write([]byte(hsh))
+			gzipw.Close()
+		}
 
 		// Close everything and write into doneChan
 
@@ -355,7 +369,7 @@ func (uploadRequest *UploadRequest) UploadBodyBuilder(reader io.Reader, inpSize 
 			}
 		} else {
 			pW.Close()
-			doneChan <- hex.EncodeToString(hash.Sum(nil))
+			doneChan <- hsh
 		}
 	}()
 
