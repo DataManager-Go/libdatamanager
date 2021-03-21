@@ -409,7 +409,7 @@ func (request Request) Do(retVar interface{}) (*RestRequestResponse, error) {
 			return nil, err
 		}
 
-		response.Message = fmt.Sprintf("[%d] %s: %s", errRes.Code, errRes.Err, errRes.Message)
+		response.Message = fmt.Sprintf("%s", errRes.Message)
 	}
 
 	return response, nil

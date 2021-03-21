@@ -157,9 +157,11 @@ func (fileRequest *FileDownloadRequest) Do() (*FileDownloadResponse, error) {
 	checksum := resp.Header.Get(HeaderChecksum)
 	// Get encryption header
 	encryption := resp.Header.Get(HeaderEncryption)
+	// Get filetype
+	fileType := resp.Header.Get(HeaderFileType)
 	// Get size header
 	size := GetFilesizeFromDownloadRequest(resp)
-	// Get FileID
+	// Get size header
 	var id uint
 	iid, err := strconv.ParseUint(resp.Header.Get(HeaderFileID), 10, 32)
 	if err == nil {
@@ -178,6 +180,7 @@ func (fileRequest *FileDownloadRequest) Do() (*FileDownloadResponse, error) {
 		Response:        resp,
 		ServerChecksum:  checksum,
 		Encryption:      encryption,
+		FileType:        fileType,
 		ServerFileName:  serverFileName,
 		Size:            size,
 		DownloadRequest: fileRequest,
@@ -253,6 +256,7 @@ type FileDownloadResponse struct {
 	Encryption      string
 	FileID          uint
 	Extract         bool
+	FileType        string
 	DownloadRequest *FileDownloadRequest
 }
 

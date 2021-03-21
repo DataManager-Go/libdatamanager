@@ -33,6 +33,9 @@ const (
 	// HeaderEncryption encryption header
 	HeaderEncryption string = "X-Encryption"
 
+	// HeaderFileType filetype header
+	HeaderFileType string = "X-FileType"
+
 	// HeaderContentLength request content length
 	HeaderContentLength string = "ContentLength"
 
