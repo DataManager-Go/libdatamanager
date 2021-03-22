@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 
 	"github.com/JojiiOfficial/gaw"
 	gzip "github.com/klauspost/pgzip"
@@ -153,23 +155,37 @@ func (uploadRequest *UploadRequest) BuildRequestStruct(Type UploadType) *UploadR
 	}
 }
 
-// UploadURL uploads an url
-func (uploadRequest UploadRequest) UploadURL(u *url.URL) (*UploadResponse, error) {
+// UploadURL make a get request and forward the responsebody to a datavault upload
+func (uploadRequest UploadRequest) UploadURL(u *url.URL, uploadDone chan string, cancel chan bool) (*UploadResponse, error) {
 	if len(uploadRequest.Name) == 0 {
 		uploadRequest.Name = u.Hostname()
 	}
 
-	// Allow uploading http(s) urls only
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, ErrUnsupportedScheme
+	client := http.Client{}
+
+	// Build a new request
+	req, err := http.NewRequest("GET", u.String(), nil)
+	req.Header.Add("User-Agent", "curl")
+	if err != nil {
+		return nil, err
 	}
 
-	// Build request payload
-	request := uploadRequest.BuildRequestStruct(URLUploadType)
-	request.URL = u.String()
+	// Do the request
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
-	// Upload
-	return uploadRequest.Do(nil, request, JSONContentType)
+	// Try to get the size to upload
+	size := int64(0)
+	length := resp.Header.Get("Content-Length")
+	if len(length) > 0 {
+		size, _ = strconv.ParseInt(length, 10, 64)
+	}
+
+	// Upload the responses body
+	return uploadRequest.UploadFromReader(resp.Body, size, uploadDone, cancel)
 }
 
 // UploadFromReader upload a file using r as data source
