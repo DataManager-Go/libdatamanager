@@ -1,0 +1,15 @@
+version: 2
+updates:
+- package-ecosystem: gomod
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+  ignore:
+  - dependency-name: filippo.io/age
+    versions:
+    - 1.0.0-beta7
+    - 1.0.0-rc.1
+  - dependency-name: github.com/jinzhu/gorm
+    versions:
+    - 1.9.16
